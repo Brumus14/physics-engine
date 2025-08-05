@@ -1,3 +1,3 @@
 pub mod object;
+pub mod types;
 pub mod world;
-pub use nalgebra::Vector2;

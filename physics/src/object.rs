@@ -1,26 +1,26 @@
-use nalgebra::Vector2;
+use crate::types::*;
 
 pub enum Shape {
     Point,
     Circle(f64),
-    Polygon(Vec<Vector2<f64>>),
+    Polygon(Vec<[f64; 2]>),
 }
 
 pub struct Object {
-    pub position: Vector2<f64>,
-    pub velocity: Vector2<f64>,
-    pub acceleration: Vector2<f64>,
+    pub position: Vec2<unit::f64::Length>,
+    pub velocity: Vec2<unit::f64::Velocity>,
+    pub acceleration: Vec2<unit::f64::Acceleration>,
     // Add unit conversions
-    pub mass: f64,
+    pub mass: unit::mass::kilogram,
     pub shape: Shape,
 }
 
 impl Object {
     pub fn new(
-        position: Vector2<f64>,
-        velocity: Vector2<f64>,
-        acceleration: Vector2<f64>,
-        mass: f64,
+        position: Vec2<unit::f64::Length>,
+        velocity: Vec2<unit::f64::Velocity>,
+        acceleration: Vec2<unit::f64::Acceleration>,
+        mass: unit::mass::kilogram,
         shape: Shape,
     ) -> Self {
         Self {
@@ -33,7 +33,8 @@ impl Object {
     }
 
     pub fn step(&mut self, delta_time: f64) {
-        self.velocity += self.acceleration * delta_time;
-        self.position += self.velocity * delta_time;
+        let physics_delta_time = unit::time::Time::new::<unit::time::second>(delta_time);
+        self.velocity += self.acceleration * physics_delta_time;
+        self.position += self.velocity * physics_delta_time;
     }
 }

@@ -1,3 +1,5 @@
+use nalgebra::Vector2;
+
 use crate::object::Object;
 
 pub struct World {
@@ -17,7 +19,26 @@ impl World {
     }
 
     pub fn step(&mut self, delta_time: f64) {
-        for object in &mut self.objects {
+        let mut accelerations = vec![Vector2::new(0.0, 0.0); self.objects.len()];
+
+        for i in 0..self.objects.len() {
+            for j in (i + 1)..self.objects.len() {
+                let (a, b) = (&self.objects[i], &self.objects[j]);
+
+                let direction = b.position - a.position;
+                let distance_squared = direction.norm_squared().max(0.0001);
+
+                let g = 1.0;
+
+                let force = g * a.mass * b.mass / distance_squared;
+
+                accelerations[i] += direction.normalize() * (force / a.mass);
+                accelerations[j] -= direction.normalize() * (force / b.mass);
+            }
+        }
+
+        for (object, acceleration) in self.objects.iter_mut().zip(accelerations) {
+            object.acceleration = acceleration;
             object.step(delta_time);
         }
     }
