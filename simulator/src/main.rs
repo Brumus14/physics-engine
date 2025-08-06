@@ -9,6 +9,7 @@ use physics::{
     types::Vec2 as PhysicsVec2,
     world::World,
 };
+use rand::Rng;
 
 const POINT_SIZE: f32 = 3.0;
 
@@ -104,28 +105,67 @@ fn startup(
         }),
     ));
 
-    spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Vec2::new(0.0, 100.0),
-        Vec2::new(100.0, 0.0),
-        4000000.0,
-        Shape::Circle(100.0),
-        Color::linear_rgb(0.0, 1.0, 0.0),
-    );
+    // spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Vec2::new(0.0, 100.0),
+    //     Vec2::new(100.0, 0.0),
+    //     4000000.0,
+    //     Shape::Circle(100.0),
+    //     Color::linear_rgb(0.0, 1.0, 0.0),
+    // );
+    //
+    // spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Vec2::new(0.0, -100.0),
+    //     Vec2::new(-100.0, 0.0),
+    //     4000000.0,
+    //     Shape::Circle(100.0),
+    //     Color::linear_rgb(1.0, 0.0, 0.0),
+    // );
+
+    let mut rng = rand::rng();
+
+    for _ in 0..100 {
+        let size = rng.random_range(40.0..100.0);
+        spawn_physics_object(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut physics_world,
+            Vec2::new(
+                rng.random_range(-1000.0..=1000.0),
+                rng.random_range(-500.0..=500.0),
+            ),
+            Vec2::new(
+                rng.random_range(-10.0..=10.0),
+                rng.random_range(-10.0..=10.0),
+            ),
+            size,
+            Shape::Circle(size / 15.0),
+            Color::linear_rgb(
+                rng.random_range(0.0..1.0),
+                rng.random_range(0.0..1.0),
+                rng.random_range(0.0..1.0),
+            ),
+        );
+    }
 
     spawn_physics_object(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        Vec2::new(0.0, -100.0),
-        Vec2::new(-100.0, 0.0),
-        4000000.0,
+        Vec2::ZERO,
+        Vec2::ZERO,
+        100000.0,
         Shape::Circle(100.0),
-        Color::linear_rgb(1.0, 0.0, 0.0),
+        Color::WHITE,
     );
 }
 
