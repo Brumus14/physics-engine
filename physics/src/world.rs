@@ -2,6 +2,8 @@ use nalgebra::Vector2;
 
 use crate::object::Object;
 
+const GRAVITATIONAL_CONSTANT: f64 = 1.0;
+
 pub struct World {
     objects: Vec<Object>,
 }
@@ -21,19 +23,18 @@ impl World {
     pub fn step(&mut self, delta_time: f64) {
         let mut accelerations = vec![Vector2::new(0.0, 0.0); self.objects.len()];
 
-        for i in 0..self.objects.len() {
+        for i in 0..(self.objects.len() - 1) {
             for j in (i + 1)..self.objects.len() {
                 let (a, b) = (&self.objects[i], &self.objects[j]);
 
                 let direction = b.position - a.position;
+                // TODO: Review this
                 let distance_squared = direction.norm_squared().max(0.0001);
 
-                let g = 1.0;
+                let force = GRAVITATIONAL_CONSTANT / distance_squared;
 
-                let force = g * a.mass * b.mass / distance_squared;
-
-                accelerations[i] += direction.normalize() * (force / a.mass);
-                accelerations[j] -= direction.normalize() * (force / b.mass);
+                accelerations[i] += direction.normalize() * force * b.mass;
+                accelerations[j] -= direction.normalize() * force * a.mass;
             }
         }
 

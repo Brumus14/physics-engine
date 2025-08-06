@@ -7,34 +7,27 @@ pub enum Shape {
 }
 
 pub struct Object {
-    pub position: Vec2<unit::f64::Length>,
-    pub velocity: Vec2<unit::f64::Velocity>,
-    pub acceleration: Vec2<unit::f64::Acceleration>,
+    pub position: Vec2<f64>,
+    pub velocity: Vec2<f64>,
+    pub acceleration: Vec2<f64>,
     // Add unit conversions
-    pub mass: unit::mass::kilogram,
+    pub mass: f64,
     pub shape: Shape,
 }
 
 impl Object {
-    pub fn new(
-        position: Vec2<unit::f64::Length>,
-        velocity: Vec2<unit::f64::Velocity>,
-        acceleration: Vec2<unit::f64::Acceleration>,
-        mass: unit::mass::kilogram,
-        shape: Shape,
-    ) -> Self {
+    pub fn new(position: Vec2<f64>, velocity: Vec2<f64>, mass: f64, shape: Shape) -> Self {
         Self {
             position,
             velocity,
-            acceleration,
+            acceleration: Vec2::zeros(),
             mass,
             shape,
         }
     }
 
     pub fn step(&mut self, delta_time: f64) {
-        let physics_delta_time = unit::time::Time::new::<unit::time::second>(delta_time);
-        self.velocity += self.acceleration * physics_delta_time;
-        self.position += self.velocity * physics_delta_time;
+        self.velocity += self.acceleration * delta_time;
+        self.position += self.velocity * delta_time;
     }
 }

@@ -6,11 +6,11 @@ use bevy::{
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     object::{Object, Shape},
-    types::{Vec2 as PhysicsVec2, unit},
+    types::Vec2 as PhysicsVec2,
     world::World,
 };
 
-const POINT_SIZE: f32 = 100.0;
+const POINT_SIZE: f32 = 3.0;
 
 #[derive(Resource)]
 struct PhysicsWorld {
@@ -30,7 +30,6 @@ fn spawn_physics_object(
     physics_world: &mut ResMut<PhysicsWorld>,
     position: Vec2,
     velocity: Vec2,
-    acceleration: Vec2,
     mass: f64,
     shape: Shape,
     colour: Color,
@@ -61,7 +60,6 @@ fn spawn_physics_object(
     let physics_object = Object::new(
         PhysicsVec2::new(position.x as f64, position.y as f64),
         PhysicsVec2::new(velocity.x as f64, velocity.y as f64),
-        PhysicsVec2::new(acceleration.x as f64, acceleration.y as f64),
         mass,
         shape,
     );
@@ -98,7 +96,13 @@ fn startup(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut physics_world: ResMut<PhysicsWorld>,
 ) {
-    commands.spawn(Camera2d);
+    commands.spawn((
+        Camera2d,
+        Projection::from(OrthographicProjection {
+            scale: 1.0,
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
 
     spawn_physics_object(
         &mut commands,
@@ -107,9 +111,8 @@ fn startup(
         &mut physics_world,
         Vec2::new(0.0, 100.0),
         Vec2::new(100.0, 0.0),
-        Vec2::new(0.0, 0.0),
         4000000.0,
-        Shape::Point,
+        Shape::Circle(100.0),
         Color::linear_rgb(0.0, 1.0, 0.0),
     );
 
@@ -120,9 +123,8 @@ fn startup(
         &mut physics_world,
         Vec2::new(0.0, -100.0),
         Vec2::new(-100.0, 0.0),
-        Vec2::new(0.0, 0.0),
         4000000.0,
-        Shape::Point,
+        Shape::Circle(100.0),
         Color::linear_rgb(1.0, 0.0, 0.0),
     );
 }
