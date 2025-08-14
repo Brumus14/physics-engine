@@ -1,4 +1,4 @@
-use crate::types::*;
+use crate::types::math::*;
 
 pub enum Shape {
     Point,
@@ -7,27 +7,25 @@ pub enum Shape {
 }
 
 pub struct Object {
-    pub position: Vec2<f64>,
-    pub velocity: Vec2<f64>,
-    pub acceleration: Vec2<f64>,
-    // Add unit conversions
+    pub position: Vector<f64>,
+    pub velocity: Vector<f64>,
+    pub force: Vector<f64>,
     pub mass: f64,
-    pub shape: Shape,
 }
 
 impl Object {
-    pub fn new(position: Vec2<f64>, velocity: Vec2<f64>, mass: f64, shape: Shape) -> Self {
+    pub fn new(position: Vector<f64>, velocity: Vector<f64>, mass: f64) -> Self {
         Self {
             position,
             velocity,
-            acceleration: Vec2::zeros(),
+            force: Vector::zeros(),
             mass,
-            shape,
         }
     }
 
     pub fn step(&mut self, delta_time: f64) {
-        self.velocity += self.acceleration * delta_time;
+        self.velocity += (self.force / self.mass) * delta_time;
         self.position += self.velocity * delta_time;
+        self.force = Vector::zeros();
     }
 }

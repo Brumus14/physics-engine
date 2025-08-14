@@ -6,7 +6,7 @@ use bevy::{
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     object::{Object, Shape},
-    types::Vec2 as PhysicsVec2,
+    types::math::*,
     world::World,
 };
 use rand::Rng;
@@ -59,10 +59,9 @@ fn spawn_physics_object(
     };
 
     let physics_object = Object::new(
-        PhysicsVec2::new(position.x as f64, position.y as f64),
-        PhysicsVec2::new(velocity.x as f64, velocity.y as f64),
+        Vector::new(position.x as f64, position.y as f64),
+        Vector::new(velocity.x as f64, velocity.y as f64),
         mass,
-        shape,
     );
 
     let physics_id = physics_world.world.add(physics_object);
@@ -105,68 +104,70 @@ fn startup(
         }),
     ));
 
-    // spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Vec2::new(0.0, 100.0),
-    //     Vec2::new(100.0, 0.0),
-    //     4000000.0,
-    //     Shape::Circle(100.0),
-    //     Color::linear_rgb(0.0, 1.0, 0.0),
-    // );
-    //
-    // spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Vec2::new(0.0, -100.0),
-    //     Vec2::new(-100.0, 0.0),
-    //     4000000.0,
-    //     Shape::Circle(100.0),
-    //     Color::linear_rgb(1.0, 0.0, 0.0),
-    // );
-
-    let mut rng = rand::rng();
-
-    for _ in 0..100 {
-        let size = rng.random_range(40.0..100.0);
-        spawn_physics_object(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &mut physics_world,
-            Vec2::new(
-                rng.random_range(-1000.0..=1000.0),
-                rng.random_range(-500.0..=500.0),
-            ),
-            Vec2::new(
-                rng.random_range(-10.0..=10.0),
-                rng.random_range(-10.0..=10.0),
-            ),
-            size,
-            Shape::Circle(size / 15.0),
-            Color::linear_rgb(
-                rng.random_range(0.0..1.0),
-                rng.random_range(0.0..1.0),
-                rng.random_range(0.0..1.0),
-            ),
-        );
-    }
+    spawn_physics_object(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Vec2::new(0.0, 100.0),
+        Vec2::new(100.0, 0.0),
+        4000000.0,
+        Shape::Circle(100.0),
+        Color::linear_rgb(0.0, 1.0, 0.0),
+    );
 
     spawn_physics_object(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        Vec2::ZERO,
-        Vec2::ZERO,
-        100000.0,
+        Vec2::new(0.0, -100.0),
+        Vec2::new(-100.0, 0.0),
+        4000000.0,
         Shape::Circle(100.0),
-        Color::WHITE,
+        Color::linear_rgb(1.0, 0.0, 0.0),
     );
+
+    physics_world.world.thing();
+
+    // let mut rng = rand::rng();
+    //
+    // for _ in 0..100 {
+    //     let size = rng.random_range(40.0..100.0);
+    //     spawn_physics_object(
+    //         &mut commands,
+    //         &mut meshes,
+    //         &mut materials,
+    //         &mut physics_world,
+    //         Vec2::new(
+    //             rng.random_range(-1000.0..=1000.0),
+    //             rng.random_range(-500.0..=500.0),
+    //         ),
+    //         Vec2::new(
+    //             rng.random_range(-10.0..=10.0),
+    //             rng.random_range(-10.0..=10.0),
+    //         ),
+    //         size,
+    //         Shape::Circle(size / 15.0),
+    //         Color::linear_rgb(
+    //             rng.random_range(0.0..1.0),
+    //             rng.random_range(0.0..1.0),
+    //             rng.random_range(0.0..1.0),
+    //         ),
+    //     );
+    // }
+    //
+    // spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Vec2::ZERO,
+    //     Vec2::ZERO,
+    //     100000.0,
+    //     Shape::Circle(100.0),
+    //     Color::WHITE,
+    // );
 }
 
 fn update_physics(
@@ -176,6 +177,7 @@ fn update_physics(
 ) {
     let physics_world = &mut physics_world.world;
 
+    physics_world.apply_forces();
     physics_world.step(time.delta_secs_f64());
 
     query.iter_mut().for_each(|(mut transform, physics)| {

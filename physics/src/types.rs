@@ -1,5 +1,5 @@
-use nalgebra::Vector2;
-
-pub type Vec2<T> = Vector2<T>;
-
-pub use uom::si as unit;
+pub mod math {
+    pub type Vector<T> = nalgebra::Vector2<T>;
+    pub type Point<T> = nalgebra::Point2<T>;
+    pub type Translation<T> = nalgebra::Translation2<T>;
+}
