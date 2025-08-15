@@ -1,6 +1,7 @@
+pub mod body;
+pub mod collision;
 pub mod force_generator;
 mod id_pool;
-pub mod object;
 pub mod types;
 pub mod world;
 

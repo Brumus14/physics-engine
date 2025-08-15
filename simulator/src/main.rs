@@ -6,8 +6,8 @@ use bevy::{
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     Id,
+    body::{Object, Shape},
     force_generator::{ConstantAcceleration, Gravity},
-    object::{Object, Shape},
     types::math::*,
     world::World,
 };
