@@ -1,67 +1,51 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
-use crate::{
-    force_generator::{ConstantAcceleration, ForceGenerator, Gravity},
-    object::Object,
-    types::math::*,
-};
+use crate::{force_generator::ForceGenerator, id_pool::IdPool, object::Object};
 
-pub type ObjectId = usize;
+pub type Id = usize;
 
 pub struct World {
-    objects: HashMap<ObjectId, Object>,
+    objects: HashMap<Id, Object>,
     // Is there a cleaner way?
-    force_generators: Vec<Box<dyn ForceGenerator + Send + Sync>>,
-    next_id: ObjectId,
-    free_ids: VecDeque<ObjectId>,
+    force_generators: HashMap<Id, Box<dyn ForceGenerator + Send + Sync>>,
+    object_id_pool: IdPool,
+    force_generator_id_pool: IdPool,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
-            // force_generators: Vec::new(),
-            force_generators: Vec::new(),
-            next_id: 0,
-            free_ids: VecDeque::new(),
+            force_generators: HashMap::new(),
+            object_id_pool: IdPool::new(),
+            force_generator_id_pool: IdPool::new(),
         }
     }
 
-    fn get_next_id(&mut self) -> ObjectId {
-        if let Some(id) = self.free_ids.pop_front() {
-            id
-        } else {
-            self.next_id += 1;
-            self.next_id - 1
-        }
-    }
-
-    pub fn thing(&mut self) {
-        self.force_generators
-            .push(Box::new(ConstantAcceleration::new(
-                self.objects.keys().map(|i| *i).collect(),
-                Vector::new(0.0, -10.0),
-            )));
-
-        self.force_generators.push(Box::new(Gravity::new(
-            self.objects.keys().map(|i| *i).collect(),
-            1.0,
-        )));
-    }
-
-    pub fn add(&mut self, object: Object) -> ObjectId {
-        let id = self.get_next_id();
+    pub fn add_object(&mut self, object: Object) -> Id {
+        let id = self.object_id_pool.next();
         self.objects.insert(id, object);
-        self.objects.len() - 1
+        id
     }
 
-    pub fn remove(&mut self, id: ObjectId) {
+    pub fn remove_object(&mut self, id: Id) {
         self.objects.remove(&id);
-        self.free_ids.push_back(id);
+        self.object_id_pool.free(id);
+    }
+
+    pub fn add_force_generator(&mut self, generator: Box<dyn ForceGenerator + Send + Sync>) -> Id {
+        let id = self.force_generator_id_pool.next();
+        self.force_generators.insert(id, generator);
+        id
+    }
+
+    pub fn remove_force_generator(&mut self, id: Id) {
+        self.force_generators.remove(&id);
+        self.object_id_pool.free(id);
     }
 
     pub fn apply_forces(&mut self) {
-        for generator in self.force_generators.iter_mut() {
+        for generator in self.force_generators.values_mut() {
             generator.apply(&mut self.objects);
         }
     }
@@ -70,11 +54,11 @@ impl World {
         self.objects.values_mut().for_each(|o| o.step(delta_time));
     }
 
-    pub fn get(&self, id: ObjectId) -> Option<&Object> {
+    pub fn get_object(&self, id: Id) -> Option<&Object> {
         self.objects.get(&id)
     }
 
-    pub fn get_mut(&mut self, id: ObjectId) -> Option<&mut Object> {
+    pub fn get_object_mut(&mut self, id: Id) -> Option<&mut Object> {
         self.objects.get_mut(&id)
     }
 }

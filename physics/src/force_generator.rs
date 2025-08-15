@@ -1,26 +1,24 @@
 use std::collections::HashMap;
 
-use nalgebra::distance_squared;
-
-use crate::{object::Object, types::math::*, world::ObjectId};
+use crate::{id_pool::Id, object::Object, types::math::*};
 
 pub trait ForceGenerator: Send + Sync {
-    fn apply(&self, objects: &mut HashMap<ObjectId, Object>);
+    fn apply(&self, objects: &mut HashMap<Id, Object>);
 }
 
 pub struct ConstantForce {
-    objects: Vec<ObjectId>,
+    objects: Vec<Id>,
     force: Vector<f64>,
 }
 
 impl ConstantForce {
-    pub fn new(objects: Vec<ObjectId>, force: Vector<f64>) -> Self {
+    pub fn new(objects: Vec<Id>, force: Vector<f64>) -> Self {
         Self { objects, force }
     }
 }
 
 impl ForceGenerator for ConstantForce {
-    fn apply(&self, objects: &mut HashMap<ObjectId, Object>) {
+    fn apply(&self, objects: &mut HashMap<Id, Object>) {
         for id in self.objects.iter() {
             if let Some(object) = objects.get_mut(id) {
                 object.force += self.force;
@@ -30,12 +28,12 @@ impl ForceGenerator for ConstantForce {
 }
 
 pub struct ConstantAcceleration {
-    objects: Vec<ObjectId>,
+    objects: Vec<Id>,
     acceleration: Vector<f64>,
 }
 
 impl ConstantAcceleration {
-    pub fn new(objects: Vec<ObjectId>, acceleration: Vector<f64>) -> Self {
+    pub fn new(objects: Vec<Id>, acceleration: Vector<f64>) -> Self {
         Self {
             objects,
             acceleration,
@@ -44,7 +42,7 @@ impl ConstantAcceleration {
 }
 
 impl ForceGenerator for ConstantAcceleration {
-    fn apply(&self, objects: &mut HashMap<ObjectId, Object>) {
+    fn apply(&self, objects: &mut HashMap<Id, Object>) {
         for id in self.objects.iter() {
             if let Some(object) = objects.get_mut(id) {
                 object.force += self.acceleration * object.mass;
@@ -54,12 +52,12 @@ impl ForceGenerator for ConstantAcceleration {
 }
 
 pub struct Gravity {
-    objects: Vec<ObjectId>,
+    objects: Vec<Id>,
     gravitational_constant: f64,
 }
 
 impl Gravity {
-    pub fn new(objects: Vec<ObjectId>, gravitational_constant: f64) -> Self {
+    pub fn new(objects: Vec<Id>, gravitational_constant: f64) -> Self {
         Self {
             objects,
             gravitational_constant,
@@ -68,7 +66,7 @@ impl Gravity {
 }
 
 impl ForceGenerator for Gravity {
-    fn apply(&self, objects: &mut HashMap<ObjectId, Object>) {
+    fn apply(&self, objects: &mut HashMap<Id, Object>) {
         for i in 0..self.objects.len() {
             for j in (i + 1)..self.objects.len() {
                 let (a, b) = (

@@ -5,13 +5,14 @@ use bevy::{
 };
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
+    Id,
+    force_generator::{ConstantAcceleration, Gravity},
     object::{Object, Shape},
     types::math::*,
     world::World,
 };
-use rand::Rng;
 
-const POINT_SIZE: f32 = 3.0;
+const POINT_SIZE: f32 = 10.0;
 
 #[derive(Resource)]
 struct PhysicsWorld {
@@ -21,7 +22,7 @@ struct PhysicsWorld {
 #[derive(Component)]
 struct PhysicsObject {
     // Switch from usize to some handle
-    id: usize,
+    id: Id,
 }
 
 fn spawn_physics_object(
@@ -34,7 +35,7 @@ fn spawn_physics_object(
     mass: f64,
     shape: Shape,
     colour: Color,
-) {
+) -> Id {
     let mesh: Mesh = match &shape {
         Shape::Point => Circle::new(POINT_SIZE).into(),
         Shape::Circle(radius) => Circle::new(radius.clone() as f32).into(),
@@ -64,7 +65,7 @@ fn spawn_physics_object(
         mass,
     );
 
-    let physics_id = physics_world.world.add(physics_object);
+    let physics_id = physics_world.world.add_object(physics_object);
 
     commands.spawn((
         Mesh2d(meshes.add(mesh)),
@@ -72,6 +73,8 @@ fn spawn_physics_object(
         Transform::from_xyz(position.x, position.y, 0.0),
         PhysicsObject { id: physics_id },
     ));
+
+    physics_id
 }
 
 fn main() {
@@ -104,70 +107,59 @@ fn startup(
         }),
     ));
 
-    spawn_physics_object(
+    let a = spawn_physics_object(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
         Vec2::new(0.0, 100.0),
-        Vec2::new(100.0, 0.0),
-        4000000.0,
-        Shape::Circle(100.0),
+        Vec2::new(200.0, 0.0),
+        1.0,
+        Shape::Point,
         Color::linear_rgb(0.0, 1.0, 0.0),
     );
 
-    spawn_physics_object(
+    let b = spawn_physics_object(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
         Vec2::new(0.0, -100.0),
         Vec2::new(-100.0, 0.0),
-        4000000.0,
-        Shape::Circle(100.0),
+        1.0,
+        Shape::Point,
         Color::linear_rgb(1.0, 0.0, 0.0),
     );
 
-    physics_world.world.thing();
+    let c = spawn_physics_object(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Vec2::new(-200.0, -300.0),
+        Vec2::new(50.0, 0.0),
+        1.0,
+        Shape::Point,
+        Color::linear_rgb(0.5, 0.5, 0.0),
+    );
 
-    // let mut rng = rand::rng();
-    //
-    // for _ in 0..100 {
-    //     let size = rng.random_range(40.0..100.0);
-    //     spawn_physics_object(
-    //         &mut commands,
-    //         &mut meshes,
-    //         &mut materials,
-    //         &mut physics_world,
-    //         Vec2::new(
-    //             rng.random_range(-1000.0..=1000.0),
-    //             rng.random_range(-500.0..=500.0),
-    //         ),
-    //         Vec2::new(
-    //             rng.random_range(-10.0..=10.0),
-    //             rng.random_range(-10.0..=10.0),
-    //         ),
-    //         size,
-    //         Shape::Circle(size / 15.0),
-    //         Color::linear_rgb(
-    //             rng.random_range(0.0..1.0),
-    //             rng.random_range(0.0..1.0),
-    //             rng.random_range(0.0..1.0),
-    //         ),
-    //     );
-    // }
-    //
-    // spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Vec2::ZERO,
-    //     Vec2::ZERO,
-    //     100000.0,
-    //     Shape::Circle(100.0),
-    //     Color::WHITE,
-    // );
+    physics_world
+        .world
+        .add_force_generator(Box::new(Gravity::new(vec![a, b, c], 4000000.0)));
+
+    physics_world
+        .world
+        .add_force_generator(Box::new(ConstantAcceleration::new(
+            vec![a],
+            Vector::new(0.0, -20.0),
+        )));
+
+    physics_world
+        .world
+        .add_force_generator(Box::new(ConstantAcceleration::new(
+            vec![a],
+            Vector::new(0.0, 20.0),
+        )));
 }
 
 fn update_physics(
@@ -181,7 +173,7 @@ fn update_physics(
     physics_world.step(time.delta_secs_f64());
 
     query.iter_mut().for_each(|(mut transform, physics)| {
-        let position = physics_world.get(physics.id).unwrap().position;
+        let position = physics_world.get_object(physics.id).unwrap().position;
         transform.translation.x = position.x as f32;
         transform.translation.y = position.y as f32;
     });
