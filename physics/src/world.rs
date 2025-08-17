@@ -1,31 +1,35 @@
 use std::collections::HashMap;
 
-use crate::{body::Body, force_generator::ForceGenerator, id_pool::IdPool};
+use crate::{
+    body::{AngularState, Body, LinearState, Shape},
+    force_generator::ForceGenerator,
+    id_pool::IdPool,
+};
 
 pub type Id = usize;
 
 pub struct World {
-    bodies: HashMap<Id, Body>,
+    body_id_pool: IdPool,
+    linear_states: HashMap<Id, LinearState>,
+    angular_states: HashMap<Id, AngularState>,
+    shapes: HashMap<Id, Shape>,
     // Is there a cleaner way?
     force_generators: HashMap<Id, Box<dyn ForceGenerator + Send + Sync>>,
-    body_id_pool: IdPool,
-    force_generator_id_pool: IdPool,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
-            bodies: HashMap::new(),
-            force_generators: HashMap::new(),
             body_id_pool: IdPool::new(),
-            force_generator_id_pool: IdPool::new(),
+            linear_states: HashMap::new(),
+            angular_states: HashMap::new(),
+            shapes: HashMap::new(),
+            force_generators: HashMap::new(),
         }
     }
 
-    pub fn add_body(&mut self, body: Body) -> Id {
-        let id = self.body_id_pool.next();
-        self.bodies.insert(id, body);
-        id
+    pub fn add_body(&mut self, body: Box<dyn Body>) -> Id {
+        self.body_id_pool.next()
     }
 
     pub fn remove_body(&mut self, id: Id) {
@@ -50,15 +54,15 @@ impl World {
         }
     }
 
-    pub fn step(&mut self, delta_time: f64) {
-        self.bodies.values_mut().for_each(|o| o.step(delta_time));
-    }
+    // pub fn step(&mut self, delta_time: f64) {
+    //     self.bodies.values_mut().for_each(|o| o.step(delta_time));
+    // }
 
-    pub fn get_body(&self, id: Id) -> Option<&Body> {
+    pub fn get_body(&self, id: Id) -> Option<&Box<dyn Body>> {
         self.bodies.get(&id)
     }
 
-    pub fn get_body_mut(&mut self, id: Id) -> Option<&mut Body> {
+    pub fn get_body_mut(&mut self, id: Id) -> Option<&mut Box<dyn Body>> {
         self.bodies.get_mut(&id)
     }
 }
