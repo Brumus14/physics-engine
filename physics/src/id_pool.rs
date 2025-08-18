@@ -29,4 +29,8 @@ impl IdPool {
             self.free_ids.push(id);
         }
     }
+
+    pub fn max(&self) -> Id {
+        self.next_id - 1
+    }
 }

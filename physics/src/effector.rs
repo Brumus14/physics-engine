@@ -1,0 +1,131 @@
+use std::collections::HashMap;
+
+use crate::{
+    body::{AngularState, LinearState},
+    id_pool::Id,
+    types::math::*,
+};
+
+pub trait Effector: Send + Sync {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        angular_states: &mut HashMap<Id, AngularState>,
+    );
+}
+
+pub struct ConstantForce {
+    bodies: Vec<Id>,
+    force: Vector<f64>,
+}
+
+impl ConstantForce {
+    pub fn new(bodies: Vec<Id>, force: Vector<f64>) -> Self {
+        Self { bodies, force }
+    }
+}
+
+impl Effector for ConstantForce {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        _: &mut HashMap<Id, AngularState>,
+    ) {
+        for id in self.bodies.iter() {
+            linear_states.get_mut(id).unwrap().force += self.force;
+        }
+    }
+}
+
+pub struct ConstantAcceleration {
+    bodies: Vec<Id>,
+    acceleration: Vector<f64>,
+}
+
+impl ConstantAcceleration {
+    pub fn new(bodies: Vec<Id>, acceleration: Vector<f64>) -> Self {
+        Self {
+            bodies,
+            acceleration,
+        }
+    }
+}
+
+impl Effector for ConstantAcceleration {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        _: &mut HashMap<Id, AngularState>,
+    ) {
+        for id in self.bodies.iter() {
+            let linear = linear_states.get_mut(id).unwrap();
+            linear.force += self.acceleration * linear.mass;
+        }
+    }
+}
+
+pub struct Gravity {
+    bodies: Vec<Id>,
+    gravitational_constant: f64,
+}
+
+impl Gravity {
+    pub fn new(bodies: Vec<Id>, gravitational_constant: f64) -> Self {
+        Self {
+            bodies,
+            gravitational_constant,
+        }
+    }
+}
+
+impl Effector for Gravity {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        _: &mut HashMap<Id, AngularState>,
+    ) {
+        for i in 0..self.bodies.len() {
+            for j in (i + 1)..self.bodies.len() {
+                let (a_id, b_id) = (self.bodies[i], self.bodies[j]);
+                let (a, b) = (
+                    linear_states.get(&a_id).unwrap(),
+                    linear_states.get(&b_id).unwrap(),
+                );
+
+                let direction = b.position - a.position;
+                // TODO: Review this
+                let distance_squared = direction.norm_squared().max(0.0001);
+
+                let force = direction.normalize() * (self.gravitational_constant * a.mass * b.mass)
+                    / distance_squared;
+
+                linear_states.get_mut(&a_id).unwrap().force += force;
+                linear_states.get_mut(&b_id).unwrap().force -= force;
+            }
+        }
+    }
+}
+
+pub struct ConstantTorque {
+    bodies: Vec<Id>,
+    torque: f64,
+}
+
+impl ConstantTorque {
+    pub fn new(bodies: Vec<Id>, torque: f64) -> Self {
+        Self { bodies, torque }
+    }
+}
+
+impl Effector for ConstantTorque {
+    fn apply(
+        &self,
+        _: &mut HashMap<Id, LinearState>,
+        angular_states: &mut HashMap<Id, AngularState>,
+    ) {
+        for id in self.bodies.iter() {
+            let angular = angular_states.get_mut(id).unwrap();
+            angular.torque += self.torque;
+        }
+    }
+}

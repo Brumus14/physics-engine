@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
-    force_generator::ForceGenerator,
+    effector::Effector,
     id_pool::IdPool,
+    types::math::Vector,
 };
 
 pub type Id = usize;
@@ -14,7 +15,8 @@ pub struct World {
     angular_states: HashMap<Id, AngularState>,
     shapes: HashMap<Id, Shape>,
     // Is there a cleaner way?
-    force_generators: HashMap<Id, Box<dyn ForceGenerator + Send + Sync>>,
+    effector_id_pool: IdPool,
+    effectors: HashMap<Id, Box<dyn Effector + Send + Sync>>,
 }
 
 impl World {
@@ -24,45 +26,91 @@ impl World {
             linear_states: HashMap::new(),
             angular_states: HashMap::new(),
             shapes: HashMap::new(),
-            force_generators: HashMap::new(),
+            effector_id_pool: IdPool::new(),
+            effectors: HashMap::new(),
         }
     }
 
-    pub fn add_body(&mut self, body: Box<dyn Body>) -> Id {
-        self.body_id_pool.next()
-    }
+    pub fn add_body(&mut self, body: Body) -> Id {
+        let id = self.body_id_pool.next();
 
-    pub fn remove_body(&mut self, id: Id) {
-        self.bodies.remove(&id);
-        self.body_id_pool.free(id);
-    }
+        match body {
+            Body::Particle { linear } => {
+                self.linear_states.insert(id, linear);
+            }
+            Body::Rigid {
+                linear,
+                angular,
+                shape,
+            } => {
+                self.linear_states.insert(id, linear);
+                self.angular_states.insert(id, angular);
+                self.shapes.insert(id, shape);
+            }
+        }
 
-    pub fn add_force_generator(&mut self, generator: Box<dyn ForceGenerator + Send + Sync>) -> Id {
-        let id = self.force_generator_id_pool.next();
-        self.force_generators.insert(id, generator);
         id
     }
 
-    pub fn remove_force_generator(&mut self, id: Id) {
-        self.force_generators.remove(&id);
+    pub fn remove_body(&mut self, id: Id) {
+        self.linear_states.remove(&id);
+        self.angular_states.remove(&id);
+        self.shapes.remove(&id);
         self.body_id_pool.free(id);
     }
 
-    pub fn apply_forces(&mut self) {
-        for generator in self.force_generators.values_mut() {
-            generator.apply(&mut self.bodies);
+    pub fn add_effector(&mut self, effector: Box<dyn Effector + Send + Sync>) -> Id {
+        let id = self.effector_id_pool.next();
+        self.effectors.insert(id, effector);
+        id
+    }
+
+    pub fn remove_effector(&mut self, id: Id) {
+        self.effectors.remove(&id);
+        self.body_id_pool.free(id);
+    }
+
+    pub fn apply_effectors(&mut self) {
+        for effector in self.effectors.values_mut() {
+            effector.apply(&mut self.linear_states, &mut self.angular_states);
         }
     }
 
-    // pub fn step(&mut self, delta_time: f64) {
-    //     self.bodies.values_mut().for_each(|o| o.step(delta_time));
-    // }
+    pub fn step(&mut self, delta_time: f64) {
+        for linear in self.linear_states.values_mut() {
+            linear.velocity += (linear.force / linear.mass) * delta_time;
+            linear.position += linear.velocity * delta_time;
+            linear.force = Vector::zeros();
+        }
 
-    pub fn get_body(&self, id: Id) -> Option<&Box<dyn Body>> {
-        self.bodies.get(&id)
+        for angular in self.angular_states.values_mut() {
+            angular.velocity += (angular.torque / angular.inertia) * delta_time;
+            angular.rotation += angular.velocity * delta_time;
+            angular.torque = 0.0;
+        }
     }
 
-    pub fn get_body_mut(&mut self, id: Id) -> Option<&mut Box<dyn Body>> {
-        self.bodies.get_mut(&id)
+    pub fn get_linear(&self, id: Id) -> Option<&LinearState> {
+        self.linear_states.get(&id)
+    }
+
+    pub fn get_linear_mut(&mut self, id: Id) -> Option<&mut LinearState> {
+        self.linear_states.get_mut(&id)
+    }
+
+    pub fn get_angular(&self, id: Id) -> Option<&AngularState> {
+        self.angular_states.get(&id)
+    }
+
+    pub fn get_angular_mut(&mut self, id: Id) -> Option<&mut AngularState> {
+        self.angular_states.get_mut(&id)
+    }
+
+    pub fn get_shape(&self, id: Id) -> Option<&Shape> {
+        self.shapes.get(&id)
+    }
+
+    pub fn get_shape_mut(&mut self, id: Id) -> Option<&mut Shape> {
+        self.shapes.get_mut(&id)
     }
 }
