@@ -1,35 +1,55 @@
+pub mod default;
+
+use crate::body::{LinearState, Shape};
 use crate::id_pool::Id;
 use crate::types::math::*;
+use std::collections::HashMap;
 
+pub trait CollisionDetection {
+    fn new() -> Self;
+
+    fn detect(
+        &mut self,
+        objects: Vec<Id>,
+        linear_states: &HashMap<Id, LinearState>,
+        shapes: &HashMap<Id, Shape>,
+    ) -> Vec<CollisionData>;
+}
+
+pub trait CollisionResolution {
+    fn new() -> Self;
+
+    fn resolve(
+        &mut self,
+        collisions: Vec<CollisionData>,
+        linear_states: &HashMap<Id, LinearState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+}
+
+pub trait BroadPhase {
+    fn new() -> Self;
+
+    // Better name
+    fn cull(&mut self, objects: Vec<Id>) -> Vec<[Id; 2]>;
+}
+
+pub trait NarrowPhase {
+    fn new() -> Self;
+
+    fn detect(
+        &mut self,
+        object_pairs: Vec<[Id; 2]>,
+        linear_states: &HashMap<Id, LinearState>,
+        shapes: &HashMap<Id, Shape>,
+    ) -> Vec<CollisionData>;
+}
+
+#[derive(Debug)]
 pub struct CollisionData {
+    objects: [Id; 2],
     // Maybe use Point instead
     point: Vector<f64>,
     normal: Vector<f64>,
     depth: f64,
 }
-
-pub trait BroadPhase {
-    fn cull(objects: Vec<Id>) -> Vec<[Id; 2]>;
-}
-
-pub trait NarrowPhase {
-    fn detect(object_pairs: Vec<[Id; 2]>) -> Vec<CollisionData>;
-}
-
-pub struct DefaultBroadPhase {}
-
-impl BroadPhase for DefaultBroadPhase {
-    fn cull(objects: Vec<Id>) -> Vec<[Id; 2]> {
-        let mut pairs = Vec::new();
-
-        for i in 0..objects.len() {
-            for j in (i + 1)..objects.len() {
-                pairs.push([objects[i], objects[j]]);
-            }
-        }
-
-        pairs
-    }
-}
-
-pub struct CircleNarrowPhase {}

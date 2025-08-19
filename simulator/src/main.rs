@@ -128,8 +128,10 @@ fn startup(
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        Body::Particle {
-            linear: LinearState::new(Vector::new(0.0, 200.0), Vector::new(10.0, 0.0), 1.0),
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(-100.0, 0.0), Vector::new(10.0, 0.0), 1.0),
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Circle(50.0),
         },
         Color::linear_rgb(0.0, 1.0, 0.0),
     );
@@ -139,46 +141,17 @@ fn startup(
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        Body::Particle {
-            linear: LinearState::new(Vector::new(100.0, -200.0), Vector::new(120.0, 0.0), 1.0),
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(100.0, 0.0), Vector::new(-10.0, 0.0), 1.0),
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Circle(50.0),
         },
         Color::linear_rgb(1.0, 0.0, 0.0),
     );
 
-    let c = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Rigid {
-            linear: LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 0.5),
-            angular: AngularState::new(30.0, 5.0, 1.0),
-            shape: Shape::Rectangle {
-                width: 200.0,
-                height: 100.0,
-            },
-        },
-        Color::linear_rgb(0.5, 0.5, 0.0),
-    );
-
-    let d = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Particle {
-            linear: LinearState::new(Vector::new(-200.0, -300.0), Vector::new(50.0, 0.0), 10.0),
-        },
-        Color::linear_rgb(0.5, 0.5, 0.0),
-    );
-
     physics_world
         .world
-        .add_effector(Box::new(Gravity::new(vec![a, b, c, d], 400000.0)));
-
-    physics_world
-        .world
-        .add_effector(Box::new(ConstantTorque::new(vec![c], -1.0)));
+        .add_effector(Box::new(Gravity::new(vec![a, b], 400000.0)));
 }
 
 fn update_physics(

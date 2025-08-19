@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
+    collision::{CollisionDetection, CollisionResolution},
     effector::Effector,
     id_pool::IdPool,
     types::math::Vector,
@@ -17,6 +18,8 @@ pub struct World {
     // Is there a cleaner way?
     effector_id_pool: IdPool,
     effectors: HashMap<Id, Box<dyn Effector + Send + Sync>>,
+    collision_detector: Box<dyn CollisionDetection>,
+    collision_resolver: Box<dyn CollisionResolution>,
 }
 
 impl World {
