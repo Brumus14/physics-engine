@@ -7,10 +7,14 @@ use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     Id,
     body::{AngularState, Body, LinearState, Shape},
+    collision::default::{
+        DefaultCollisionDetector, DefaultCollisionPipeline, DefaultCollisionResolver,
+    },
     effector::{ConstantAcceleration, ConstantTorque, Gravity},
     types::math::*,
     world::World,
 };
+use rand::Rng;
 
 const PARTICLE_SIZE: f32 = 10.0;
 
@@ -123,35 +127,81 @@ fn startup(
         }),
     ));
 
-    let a = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Rigid {
-            linear: LinearState::new(Vector::new(-100.0, 0.0), Vector::new(10.0, 0.0), 1.0),
-            angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Circle(50.0),
-        },
-        Color::linear_rgb(0.0, 1.0, 0.0),
-    );
+    // let a = spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::Rigid {
+    //         linear: LinearState::new(Vector::new(-100.0, 0.0), Vector::new(10.0, 0.0), 1.0),
+    //         angular: AngularState::new(0.0, 0.0, 1.0),
+    //         shape: Shape::Circle(50.0),
+    //     },
+    //     Color::linear_rgb(0.0, 1.0, 0.0),
+    // );
+    //
+    // let b = spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::Rigid {
+    //         linear: LinearState::new(Vector::new(100.0, 0.0), Vector::new(-10.0, 0.0), 1.0),
+    //         angular: AngularState::new(0.0, 0.0, 1.0),
+    //         shape: Shape::Circle(150.0),
+    //     },
+    //     Color::linear_rgb(1.0, 0.0, 0.0),
+    // );
+    //
+    // let c = spawn_physics_object(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::Rigid {
+    //         linear: LinearState::new(Vector::new(0.0, 200.0), Vector::new(0.0, -10.0), 1.0),
+    //         angular: AngularState::new(0.0, 0.0, 1.0),
+    //         shape: Shape::Circle(75.0),
+    //     },
+    //     Color::linear_rgb(1.0, 0.0, 0.0),
+    // );
 
-    let b = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Rigid {
-            linear: LinearState::new(Vector::new(100.0, 0.0), Vector::new(-10.0, 0.0), 1.0),
-            angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Circle(50.0),
-        },
-        Color::linear_rgb(1.0, 0.0, 0.0),
-    );
+    let mut rng = rand::rng();
+    let mut bodies = Vec::new();
+
+    for _ in 0..20 {
+        bodies.push(spawn_physics_object(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut physics_world,
+            Body::Rigid {
+                linear: LinearState::new(
+                    Vector::new(
+                        rng.random_range(-600.0..600.0),
+                        rng.random_range(-400.0..400.0),
+                    ),
+                    Vector::zeros(),
+                    rng.random_range(1.0..5.0),
+                ),
+                angular: AngularState::new(0.0, 0.0, 1.0),
+                shape: Shape::Circle(50.0),
+            },
+            Color::linear_rgb(
+                rng.random_range(0.0..1.0),
+                rng.random_range(0.0..1.0),
+                rng.random_range(0.0..1.0),
+            ),
+        ));
+    }
 
     physics_world
         .world
-        .add_effector(Box::new(Gravity::new(vec![a, b], 400000.0)));
+        .add_effector(Box::new(Gravity::new(bodies.clone(), 400000.0)));
+
+    physics_world
+        .world
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(bodies.clone())));
 }
 
 fn update_physics(
@@ -163,6 +213,7 @@ fn update_physics(
 
     physics_world.apply_effectors();
     physics_world.step(time.delta_secs_f64());
+    physics_world.handle_collisions();
 
     query.iter_mut().for_each(|(mut transform, physics)| {
         let position = physics_world.get_linear(physics.id).unwrap().position;

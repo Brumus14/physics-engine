@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
-    collision::{CollisionDetection, CollisionResolution},
+    collision::{CollisionData, CollisionDetection, CollisionPipeline, CollisionResolution},
     effector::Effector,
     id_pool::IdPool,
     types::math::Vector,
@@ -18,8 +18,8 @@ pub struct World {
     // Is there a cleaner way?
     effector_id_pool: IdPool,
     effectors: HashMap<Id, Box<dyn Effector + Send + Sync>>,
-    collision_detector: Box<dyn CollisionDetection>,
-    collision_resolver: Box<dyn CollisionResolution>,
+    collision_pipeline_id_pool: IdPool,
+    collision_pipelines: HashMap<Id, Box<dyn CollisionPipeline + Send + Sync>>,
 }
 
 impl World {
@@ -31,6 +31,8 @@ impl World {
             shapes: HashMap::new(),
             effector_id_pool: IdPool::new(),
             effectors: HashMap::new(),
+            collision_pipeline_id_pool: IdPool::new(),
+            collision_pipelines: HashMap::new(),
         }
     }
 
@@ -73,6 +75,20 @@ impl World {
         self.body_id_pool.free(id);
     }
 
+    pub fn add_collision_pipeline(
+        &mut self,
+        collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
+    ) -> Id {
+        let id = self.collision_pipeline_id_pool.next();
+        self.collision_pipelines.insert(id, collision_pipeline);
+        id
+    }
+
+    pub fn remove_collision_pipeline(&mut self, id: Id) {
+        self.collision_pipelines.remove(&id);
+        self.body_id_pool.free(id);
+    }
+
     pub fn apply_effectors(&mut self) {
         for effector in self.effectors.values_mut() {
             effector.apply(&mut self.linear_states, &mut self.angular_states);
@@ -90,6 +106,16 @@ impl World {
             angular.velocity += (angular.torque / angular.inertia) * delta_time;
             angular.rotation += angular.velocity * delta_time;
             angular.torque = 0.0;
+        }
+    }
+
+    pub fn handle_collisions(&mut self) {
+        for pipeline in self.collision_pipelines.values_mut() {
+            pipeline.handle(
+                &mut self.linear_states,
+                &mut self.angular_states,
+                &self.shapes,
+            );
         }
     }
 

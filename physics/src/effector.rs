@@ -15,8 +15,8 @@ pub trait Effector: Send + Sync {
 }
 
 pub struct ConstantForce {
-    bodies: Vec<Id>,
-    force: Vector<f64>,
+    pub bodies: Vec<Id>,
+    pub force: Vector<f64>,
 }
 
 impl ConstantForce {
@@ -38,8 +38,8 @@ impl Effector for ConstantForce {
 }
 
 pub struct ConstantAcceleration {
-    bodies: Vec<Id>,
-    acceleration: Vector<f64>,
+    pub bodies: Vec<Id>,
+    pub acceleration: Vector<f64>,
 }
 
 impl ConstantAcceleration {
@@ -65,8 +65,8 @@ impl Effector for ConstantAcceleration {
 }
 
 pub struct Gravity {
-    bodies: Vec<Id>,
-    gravitational_constant: f64,
+    pub bodies: Vec<Id>,
+    pub gravitational_constant: f64,
 }
 
 impl Gravity {
@@ -107,8 +107,8 @@ impl Effector for Gravity {
 }
 
 pub struct ConstantTorque {
-    bodies: Vec<Id>,
-    torque: f64,
+    pub bodies: Vec<Id>,
+    pub torque: f64,
 }
 
 impl ConstantTorque {
