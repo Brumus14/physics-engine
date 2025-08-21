@@ -26,8 +26,7 @@ impl CollisionPipeline for DefaultCollisionPipeline {
         shapes: &HashMap<Id, Shape>,
     ) {
         let collisions = self.detector.detect(&self.bodies, linear_states, shapes);
-        self.resolver
-            .resolve(&self.bodies, collisions, linear_states, shapes);
+        self.resolver.resolve(collisions, linear_states, shapes);
     }
 }
 
@@ -80,11 +79,13 @@ impl BroadPhase for DefaultBroadPhase {
     }
 }
 
-pub struct DefaultNarrowPhase {}
+pub struct DefaultNarrowPhase {
+    collisions: u64,
+}
 
 impl DefaultNarrowPhase {
     pub fn new() -> Self {
-        Self {}
+        Self { collisions: 0 }
     }
 }
 
@@ -114,11 +115,13 @@ impl NarrowPhase for DefaultNarrowPhase {
                 },
                 _ => None,
             } {
+                self.collisions += 1;
+                println!("{}", self.collisions);
                 collisions.push(collision);
             }
         }
 
-        println!("{:?}", collisions);
+        // println!("{:?}", collisions);
 
         collisions
     }
@@ -152,40 +155,48 @@ impl DefaultNarrowPhase {
     }
 }
 
-pub struct DefaultCollisionResolver {}
+pub struct DefaultCollisionResolver {
+    correction_level: f64,
+    correction_tolerance: f64,
+}
 
 impl DefaultCollisionResolver {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            correction_level: 0.8,
+            correction_tolerance: 0.01,
+        }
     }
 }
 
 impl CollisionResolution for DefaultCollisionResolver {
     fn resolve(
         &mut self,
-        bodies: &Vec<Id>,
         collisions: Vec<CollisionData>,
         linear_states: &mut HashMap<Id, LinearState>,
         shapes: &HashMap<Id, Shape>,
     ) {
         for collision in collisions {
-            linear_states
-                .get_mut(&collision.bodies[0])
-                .unwrap()
-                .position += collision.normal * collision.depth / 2.0;
-            linear_states
-                .get_mut(&collision.bodies[1])
-                .unwrap()
-                .position -= collision.normal * collision.depth / 2.0;
+            let a_id = collision.bodies[0];
+            let b_id = collision.bodies[1];
+            let [a_linear, b_linear] = linear_states.get_disjoint_mut([&a_id, &b_id]);
+            let a_linear = a_linear.unwrap();
+            let b_linear = b_linear.unwrap();
 
-            linear_states
-                .get_mut(&collision.bodies[0])
-                .unwrap()
-                .velocity *= 0.99;
-            linear_states
-                .get_mut(&collision.bodies[1])
-                .unwrap()
-                .velocity *= 0.99;
+            let impulse = -(1.0 + a_linear.restitution * b_linear.restitution)
+                * (a_linear.velocity - b_linear.velocity).dot(&collision.normal)
+                / (1.0 / a_linear.mass + 1.0 / b_linear.mass);
+
+            a_linear.velocity += impulse / a_linear.mass * collision.normal;
+            b_linear.velocity -= impulse / b_linear.mass * collision.normal;
+
+            // Positional correction
+            if collision.depth > self.correction_tolerance {
+                let correction = (collision.depth * self.correction_level * collision.normal)
+                    / (1.0 / a_linear.mass + 1.0 / b_linear.mass);
+                a_linear.position += correction / a_linear.mass;
+                b_linear.position -= correction / b_linear.mass;
+            }
         }
     }
 }

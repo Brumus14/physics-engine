@@ -16,15 +16,18 @@ pub struct LinearState {
     pub velocity: Vector<f64>,
     pub force: Vector<f64>,
     pub mass: f64,
+    pub restitution: f64,
 }
 
 impl LinearState {
-    pub fn new(position: Vector<f64>, velocity: Vector<f64>, mass: f64) -> Self {
+    pub fn new(position: Vector<f64>, velocity: Vector<f64>, mass: f64, restitution: f64) -> Self {
         Self {
             position,
             velocity,
             force: Vector::zeros(),
             mass,
+            // Should this be moved?
+            restitution,
         }
     }
 }

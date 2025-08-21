@@ -41,7 +41,6 @@ pub trait NarrowPhase {
 pub trait CollisionResolution {
     fn resolve(
         &mut self,
-        bodies: &Vec<Id>,
         collisions: Vec<CollisionData>,
         linear_states: &mut HashMap<Id, LinearState>,
         shapes: &HashMap<Id, Shape>,
