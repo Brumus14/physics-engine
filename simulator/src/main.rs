@@ -1,3 +1,5 @@
+use std::f64;
+
 use bevy::{
     asset::RenderAssetUsages,
     prelude::*,
@@ -7,8 +9,12 @@ use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     Id,
     body::{AngularState, Body, LinearState, Shape},
-    collision::default::{
-        DefaultCollisionDetector, DefaultCollisionPipeline, DefaultCollisionResolver,
+    collision::{
+        NarrowPhase,
+        default::{
+            DefaultCollisionDetector, DefaultCollisionPipeline, DefaultCollisionResolver,
+            DefaultNarrowPhase,
+        },
     },
     effector::{ConstantAcceleration, ConstantTorque, Gravity},
     types::math::*,
@@ -32,8 +38,8 @@ struct PhysicsObject {
 fn shape_to_mesh(shape: &Shape) -> Mesh {
     match shape {
         Shape::Circle(radius) => Circle::new(radius.clone() as f32).into(),
-        Shape::Rectangle { width, height } => {
-            Rectangle::new(width.clone() as f32, height.clone() as f32).into()
+        Shape::Rectangle(size) => {
+            Rectangle::new(size.x.clone() as f32, size.y.clone() as f32).into()
         }
         Shape::Polygon(points) => {
             let shape: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[1]]).collect();
@@ -127,61 +133,17 @@ fn startup(
         }),
     ));
 
-    // let a = spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(Vector::new(-100.0, 20.0), Vector::new(20.0, 0.0), 20.0, 0.8),
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Circle(50.0),
-    //     },
-    //     Color::linear_rgb(0.0, 1.0, 0.0),
-    // );
-    //
-    // let b = spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(Vector::new(100.0, 0.0), Vector::new(0.0, 0.0), 1.0, 0.2),
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Circle(50.0),
-    //     },
-    //     Color::linear_rgb(1.0, 0.0, 0.0),
-    // );
-    //
-    // let c = spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(Vector::new(100.0, 300.0), Vector::new(0.0, 0.0), 1.0, 0.8),
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Circle(50.0),
-    //     },
-    //     Color::linear_rgb(1.0, 0.0, 0.0),
-    // );
-
     let a = spawn_physics_object(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
         Body::Rigid {
-            linear: LinearState::new(
-                Vector::new(-100.0, 0.0),
-                Vector::new(20.0, 0.0),
-                10000.0,
-                1.0,
-            ),
+            linear: LinearState::new(Vector::new(-100.0, 0.0), Vector::new(0.0, 0.0), 1.0, 1.0),
             angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Circle(50.0),
+            shape: Shape::Rectangle(Vector::new(200.0, 100.0)),
         },
-        Color::linear_rgb(1.0, 0.0, 0.0),
+        Color::linear_rgb(0.0, 1.0, 0.0),
     );
 
     let b = spawn_physics_object(
@@ -190,45 +152,9 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::Rigid {
-            linear: LinearState::new(Vector::new(100.0, 0.0), Vector::new(0.0, 0.0), 1.0, 1.0),
+            linear: LinearState::new(Vector::new(45.0, 0.0), Vector::new(0.0, 0.0), 1.0, 1.0),
             angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Circle(50.0),
-        },
-        Color::linear_rgb(1.0, 0.0, 0.0),
-    );
-
-    // let c = spawn_physics_object(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(
-    //             Vector::new(-400.0, 0.0),
-    //             Vector::new(0.0, 0.0),
-    //             f64::INFINITY,
-    //             1.0,
-    //         ),
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Circle(50.0),
-    //     },
-    //     Color::linear_rgb(1.0, 0.0, 0.0),
-    // );
-
-    let d = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Rigid {
-            linear: LinearState::new(
-                Vector::new(400.0, 0.0),
-                Vector::new(0.0, 0.0),
-                f64::INFINITY,
-                0.2,
-            ),
-            angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Circle(50.0),
+            shape: Shape::Rectangle(Vector::new(100.0, 150.0)),
         },
         Color::linear_rgb(1.0, 0.0, 0.0),
     );
@@ -239,7 +165,7 @@ fn startup(
 
     physics_world
         .world
-        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![a, b, d])));
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![a])));
 }
 
 fn update_physics(

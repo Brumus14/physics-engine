@@ -52,6 +52,6 @@ impl AngularState {
 
 pub enum Shape {
     Circle(f64),
-    Rectangle { width: f64, height: f64 },
-    Polygon(Vec<[f64; 2]>),
+    Rectangle(Vector<f64>),
+    Polygon(Vec<Vector<f64>>),
 }

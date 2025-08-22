@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::collision::*;
 
 pub struct DefaultCollisionPipeline {
@@ -25,7 +23,9 @@ impl CollisionPipeline for DefaultCollisionPipeline {
         angular_states: &mut HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) {
-        let collisions = self.detector.detect(&self.bodies, linear_states, shapes);
+        let collisions = self
+            .detector
+            .detect(&self.bodies, linear_states, angular_states, shapes);
         self.resolver.resolve(collisions, linear_states, shapes);
     }
 }
@@ -49,11 +49,12 @@ impl CollisionDetection for DefaultCollisionDetector {
         &mut self,
         bodies: &Vec<Id>,
         linear_states: &HashMap<Id, LinearState>,
+        angular_states: &HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) -> Vec<CollisionData> {
         let body_pairs = self.broad_phase.cull(bodies);
         self.narrow_phase
-            .detect(bodies, body_pairs, linear_states, shapes)
+            .detect(bodies, body_pairs, linear_states, angular_states, shapes)
     }
 }
 
@@ -95,6 +96,7 @@ impl NarrowPhase for DefaultNarrowPhase {
         bodies: &Vec<Id>,
         body_pairs: Vec<[Id; 2]>,
         linear_states: &HashMap<Id, LinearState>,
+        angular_states: &HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) -> Vec<CollisionData> {
         let mut collisions = Vec::new();
@@ -104,12 +106,35 @@ impl NarrowPhase for DefaultNarrowPhase {
                 linear_states.get(&pair[0]).unwrap(),
                 linear_states.get(&pair[1]).unwrap(),
             );
+            let (a_angular, b_angular) = (
+                angular_states.get(&pair[0]).unwrap(),
+                angular_states.get(&pair[1]).unwrap(),
+            );
             let (a_shape, b_shape) = (shapes.get(&pair[0]).unwrap(), shapes.get(&pair[1]).unwrap());
 
             if let Some(collision) = match a_shape {
                 Shape::Circle(a_radius) => match b_shape {
                     Shape::Circle(b_radius) => DefaultNarrowPhase::detect_circle_circle(
-                        pair[0], *a_radius, a_linear, pair[1], *b_radius, b_linear,
+                        pair[0],
+                        pair[1],
+                        *a_radius,
+                        *b_radius,
+                        &a_linear.position,
+                        &b_linear.position,
+                    ),
+                    _ => None,
+                },
+                Shape::Rectangle(a_size) => match b_shape {
+                    Shape::Rectangle(b_size) => DefaultNarrowPhase::detect_rectangle_rectangle(
+                        pair[0],
+                        pair[1],
+                        a_size,
+                        b_size,
+                        // Reference or not
+                        &a_linear.position,
+                        &b_linear.position,
+                        a_angular.rotation,
+                        b_angular.rotation,
                     ),
                     _ => None,
                 },
@@ -130,13 +155,12 @@ impl NarrowPhase for DefaultNarrowPhase {
 impl DefaultNarrowPhase {
     fn detect_circle_circle(
         a_id: Id,
-        a_radius: f64,
-        a_linear: &LinearState,
         b_id: Id,
+        a_radius: f64,
         b_radius: f64,
-        b_linear: &LinearState,
+        a_position: &Vector<f64>,
+        b_position: &Vector<f64>,
     ) -> Option<CollisionData> {
-        let (a_position, b_position) = (&a_linear.position, &b_linear.position);
         let distance = a_position.metric_distance(b_position);
         let depth = a_radius + b_radius - distance;
         let normal = (a_position - b_position).normalize();
@@ -152,6 +176,46 @@ impl DefaultNarrowPhase {
         } else {
             None
         }
+    }
+
+    pub fn detect_rectangle_rectangle(
+        a_id: Id,
+        b_id: Id,
+        a_size: &Vector<f64>,
+        b_size: &Vector<f64>,
+        a_position: &Vector<f64>,
+        b_position: &Vector<f64>,
+        a_rotation: f64,
+        b_rotation: f64,
+    ) -> Option<CollisionData> {
+        let a_points = [
+            -a_size / 2.0,
+            Vector::new(a_size.x, -a_size.y) / 2.0,
+            a_size / 2.0,
+            Vector::new(-a_size.x, a_size.y) / 2.0,
+        ];
+        let b_points = [
+            -b_size / 2.0,
+            Vector::new(b_size.x, -b_size.y) / 2.0,
+            b_size / 2.0,
+            Vector::new(-b_size.x, b_size.y) / 2.0,
+        ];
+        let axes = [
+            Vector::new(a_rotation.cos(), a_rotation.sin()),
+            Vector::new(a_rotation.sin(), -a_rotation.cos()),
+            Vector::new(b_rotation.cos(), b_rotation.sin()),
+            Vector::new(b_rotation.sin(), -b_rotation.cos()),
+        ];
+
+        // for i in axes.len() {
+        //     (a_position + Rotation::new(a_rotation) * a_points[i])
+        // }
+        // let a_min;
+        // let a_max;
+        // let projected = point.dot(&axis);
+        // println!("{}", projected);
+
+        None
     }
 }
 
