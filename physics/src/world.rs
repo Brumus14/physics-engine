@@ -52,6 +52,18 @@ impl World {
                 self.angular_states.insert(id, angular);
                 self.shapes.insert(id, shape);
             }
+            // Combine body and effector ids
+            // Or
+            // Make constraint trait instead of using effector
+            Body::Soft { points, springs } => {
+                for point in points {
+                    self.linear_states.insert(id, point);
+                }
+
+                for spring in springs {
+                    self.effectors.insert(id, Box::new(spring));
+                }
+            }
         }
 
         id

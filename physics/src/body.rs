@@ -1,4 +1,4 @@
-use crate::types::math::*;
+use crate::{effector::Spring, types::math::*};
 
 pub enum Body {
     Particle {
@@ -9,6 +9,11 @@ pub enum Body {
         angular: AngularState,
         shape: Shape,
     },
+    // Mass-spring
+    Soft {
+        points: Vec<LinearState>,
+        springs: Vec<Spring>,
+    },
 }
 
 pub struct LinearState {
@@ -16,6 +21,7 @@ pub struct LinearState {
     pub velocity: Vector<f64>,
     pub force: Vector<f64>,
     pub mass: f64,
+    // Move to rigid?
     pub restitution: f64,
 }
 

@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 
+use uom::si::{
+    acceleration::attometer_per_second_squared,
+    heat_transfer::btu_per_hour_square_foot_degree_fahrenheit,
+};
+
 use crate::{
     body::{AngularState, LinearState},
     id_pool::Id,
@@ -127,5 +132,38 @@ impl Effector for ConstantTorque {
             let angular = angular_states.get_mut(id).unwrap();
             angular.torque += self.torque;
         }
+    }
+}
+
+pub struct Spring {
+    pub bodies: [Id; 2],
+    pub length: f64,
+    pub elasticity: f64,
+}
+
+impl Spring {
+    pub fn new(bodies: [Id; 2], length: f64, elasticity: f64) -> Self {
+        Self {
+            bodies,
+            length,
+            elasticity,
+        }
+    }
+}
+
+impl Effector for Spring {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        angular_states: &mut HashMap<Id, AngularState>,
+    ) {
+        let [a_linear, b_linear] = linear_states
+            .get_disjoint_mut([&self.bodies[0], &self.bodies[1]])
+            .map(|l| l.unwrap());
+        let length = a_linear.position.metric_distance(&b_linear.position);
+        let force = self.elasticity * (length - self.length);
+        let direction = (a_linear.position - b_linear.position).normalize();
+        a_linear.force += force * direction;
+        b_linear.force -= force * direction;
     }
 }

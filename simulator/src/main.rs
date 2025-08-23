@@ -22,7 +22,7 @@ use physics::{
 };
 use rand::Rng;
 
-const PARTICLE_SIZE: f32 = 10.0;
+const POINT_SIZE: f32 = 10.0;
 
 #[derive(Resource)]
 struct PhysicsWorld {
@@ -34,6 +34,9 @@ struct PhysicsObject {
     // Switch from usize to some handle
     id: Id,
 }
+
+#[derive(Component)]
+struct SoftBody;
 
 fn shape_to_mesh(shape: &Shape) -> Mesh {
     match shape {
@@ -69,38 +72,44 @@ fn spawn_physics_object(
     physics_world: &mut ResMut<PhysicsWorld>,
     body: Body,
     colour: Color,
-) -> Id {
-    let mesh: Mesh;
-    let transform: Transform;
+) -> Entity {
+    let physics_id = physics_world.world.add_body(body);
 
     match &body {
-        Body::Particle { linear } => {
-            mesh = Circle::new(PARTICLE_SIZE).into();
-            transform =
-                Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0);
-        }
+        Body::Particle { linear } => commands
+            .spawn((
+                Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
+                MeshMaterial2d(materials.add(colour)),
+                Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
+                PhysicsObject { id: physics_id },
+            ))
+            .id(),
         Body::Rigid {
             linear,
             angular,
             shape,
-        } => {
-            mesh = shape_to_mesh(shape);
-            transform =
+        } => commands
+            .spawn((
+                Mesh2d(meshes.add(shape_to_mesh(shape))),
+                MeshMaterial2d(materials.add(colour)),
                 Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0)
-                    .with_rotation(Quat::from_rotation_z(-angular.rotation as f32));
-        }
+                    .with_rotation(Quat::from_rotation_z(-angular.rotation as f32)),
+                PhysicsObject { id: physics_id },
+            ))
+            .id(),
+        Body::Soft { points, springs } => commands
+            .spawn((PhysicsObject { id: physics_id }, SoftBody))
+            .with_children(|body| {
+                for point in points {
+                    body.spawn((
+                        Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
+                        MeshMaterial2d(materials.add(colour)),
+                        Transform::from_xyz(point.position.x as f32, point.position.y as f32, 0.0),
+                    ));
+                }
+            })
+            .id(),
     }
-
-    let physics_id = physics_world.world.add_body(body);
-
-    commands.spawn((
-        Mesh2d(meshes.add(mesh)),
-        MeshMaterial2d(materials.add(colour)),
-        transform,
-        PhysicsObject { id: physics_id },
-    ));
-
-    physics_id
 }
 
 fn main() {
@@ -172,6 +181,7 @@ fn update_physics(
     mut physics_world: ResMut<PhysicsWorld>,
     time: Res<Time>,
     mut query: Query<(&mut Transform, &PhysicsObject)>,
+    // mut soft_bodies: Query<>,
 ) {
     let physics_world = &mut physics_world.world;
 
