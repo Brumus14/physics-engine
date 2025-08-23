@@ -3,6 +3,7 @@ pub type Id = usize;
 pub struct IdPool {
     next_id: Id,
     free_ids: Vec<Id>,
+    max_changed: bool,
 }
 
 impl IdPool {
@@ -10,6 +11,7 @@ impl IdPool {
         Self {
             next_id: 0,
             free_ids: Vec::new(),
+            max_changed: false,
         }
     }
 

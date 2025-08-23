@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
-    collision::{CollisionData, CollisionDetection, CollisionPipeline, CollisionResolution},
+    collision::CollisionPipeline,
     effector::Effector,
     id_pool::IdPool,
     types::math::Vector,

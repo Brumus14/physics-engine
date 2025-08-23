@@ -93,7 +93,7 @@ impl DefaultNarrowPhase {
 impl NarrowPhase for DefaultNarrowPhase {
     fn detect(
         &mut self,
-        bodies: &Vec<Id>,
+        _bodies: &Vec<Id>,
         body_pairs: Vec<[Id; 2]>,
         linear_states: &HashMap<Id, LinearState>,
         angular_states: &HashMap<Id, AngularState>,

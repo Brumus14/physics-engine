@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bevy_ecs = "0.16.1"
 nalgebra = "0.34.0"
 uom = "0.37.0"

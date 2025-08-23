@@ -1,10 +1,5 @@
 use std::collections::HashMap;
 
-use uom::si::{
-    acceleration::attometer_per_second_squared,
-    heat_transfer::btu_per_hour_square_foot_degree_fahrenheit,
-};
-
 use crate::{
     body::{AngularState, LinearState},
     id_pool::Id,
@@ -155,15 +150,45 @@ impl Effector for Spring {
     fn apply(
         &self,
         linear_states: &mut HashMap<Id, LinearState>,
-        angular_states: &mut HashMap<Id, AngularState>,
+        _angular_states: &mut HashMap<Id, AngularState>,
     ) {
         let [a_linear, b_linear] = linear_states
             .get_disjoint_mut([&self.bodies[0], &self.bodies[1]])
             .map(|l| l.unwrap());
         let length = a_linear.position.metric_distance(&b_linear.position);
         let force = self.elasticity * (length - self.length);
-        let direction = (a_linear.position - b_linear.position).normalize();
+        let direction = (b_linear.position - a_linear.position).normalize();
         a_linear.force += force * direction;
         b_linear.force -= force * direction;
+    }
+}
+
+pub struct Drag {
+    pub bodies: Vec<Id>,
+    // Better name?
+    pub coefficient: f64,
+}
+
+impl Drag {
+    pub fn new(bodies: Vec<Id>, coefficient: f64) -> Self {
+        Self {
+            bodies,
+            coefficient,
+        }
+    }
+}
+
+// Doesn't account for area
+impl Effector for Drag {
+    fn apply(
+        &self,
+        linear_states: &mut HashMap<Id, LinearState>,
+        _angular_states: &mut HashMap<Id, AngularState>,
+    ) {
+        for id in self.bodies.iter() {
+            let linear = linear_states.get_mut(id).unwrap();
+            linear.force +=
+                -(1.0 / 2.0) * linear.velocity.norm() * linear.velocity * self.coefficient;
+        }
     }
 }
