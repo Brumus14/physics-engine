@@ -1,5 +1,6 @@
-use crate::{effector::Spring, types::math::*};
+use crate::{effector::Spring, id_pool::Id, types::math::*};
 
+#[derive(Clone)]
 pub enum Body {
     Particle {
         linear: LinearState,
@@ -12,10 +13,19 @@ pub enum Body {
     // Mass-spring
     Soft {
         points: Vec<LinearState>,
+        // Spring body ids are points indices
         springs: Vec<Spring>,
     },
 }
 
+#[derive(Clone)]
+pub enum BodyId {
+    Particle(Id),
+    Rigid(Id),
+    Soft { points: Vec<Id>, springs: Vec<Id> },
+}
+
+#[derive(Clone)]
 pub struct LinearState {
     pub position: Vector<f64>,
     pub velocity: Vector<f64>,
@@ -38,6 +48,7 @@ impl LinearState {
     }
 }
 
+#[derive(Clone)]
 pub struct AngularState {
     pub rotation: f64,
     pub velocity: f64,
@@ -56,6 +67,7 @@ impl AngularState {
     }
 }
 
+#[derive(Clone)]
 pub enum Shape {
     Circle(f64),
     Rectangle(Vector<f64>),

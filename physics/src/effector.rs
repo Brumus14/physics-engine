@@ -130,6 +130,7 @@ impl Effector for ConstantTorque {
     }
 }
 
+#[derive(Clone)]
 pub struct Spring {
     pub bodies: [Id; 2],
     pub length: f64,
