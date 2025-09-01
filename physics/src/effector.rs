@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    body::{AngularState, LinearState},
+    body::{AngularState, BodyId, LinearState},
     id_pool::Id,
     types::math::*,
 };
@@ -15,12 +15,12 @@ pub trait Effector: Send + Sync {
 }
 
 pub struct ConstantForce {
-    pub bodies: Vec<Id>,
+    pub bodies: Vec<BodyId>,
     pub force: Vector<f64>,
 }
 
 impl ConstantForce {
-    pub fn new(bodies: Vec<Id>, force: Vector<f64>) -> Self {
+    pub fn new(bodies: Vec<BodyId>, force: Vector<f64>) -> Self {
         Self { bodies, force }
     }
 }
@@ -31,14 +31,24 @@ impl Effector for ConstantForce {
         linear_states: &mut HashMap<Id, LinearState>,
         _: &mut HashMap<Id, AngularState>,
     ) {
-        for id in self.bodies.iter() {
-            linear_states.get_mut(id).unwrap().force += self.force;
-        }
+        self.bodies.iter().for_each(|body_id| match body_id {
+            BodyId::Particle(id) => {
+                linear_states.get_mut(id).unwrap().force += self.force;
+            }
+            BodyId::Rigid(id) => {
+                linear_states.get_mut(id).unwrap().force += self.force;
+            }
+            BodyId::Soft { points, springs } => {
+                for id in points {
+                    linear_states.get_mut(id).unwrap().force += self.force;
+                }
+            }
+        });
     }
 }
 
 pub struct ConstantAcceleration {
-    pub bodies: Vec<Id>,
+    pub bodies: Vec<BodyId>,
     pub acceleration: Vector<f64>,
 }
 
@@ -57,10 +67,22 @@ impl Effector for ConstantAcceleration {
         linear_states: &mut HashMap<Id, LinearState>,
         _: &mut HashMap<Id, AngularState>,
     ) {
-        for id in self.bodies.iter() {
-            let linear = linear_states.get_mut(id).unwrap();
-            linear.force += self.acceleration * linear.mass;
-        }
+        self.bodies.iter().for_each(|body_id| match body_id {
+            BodyId::Particle(id) => {
+                let linear = linear_states.get_mut(id).unwrap();
+                linear.force += self.acceleration * linear.mass;
+            }
+            BodyId::Rigid(id) => {
+                let linear = linear_states.get_mut(id).unwrap();
+                linear.force += self.acceleration * linear.mass;
+            }
+            BodyId::Soft { points, springs } => {
+                for id in points {
+                    let linear = linear_states.get_mut(id).unwrap();
+                    linear.force += self.acceleration * linear.mass;
+                }
+            }
+        });
     }
 }
 
