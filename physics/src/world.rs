@@ -65,14 +65,12 @@ impl World {
                     point_ids.push(id);
                 }
 
-                for mut spring in springs {
-                    spring.bodies[0] = point_ids[spring.bodies[0]];
-                    spring.bodies[1] = point_ids[spring.bodies[1]];
-                    spring.bodies = spring.bodies.map(|i| point_ids[i]);
-                    let id = self.effector_id_pool.next();
-                    self.effectors.insert(id, Box::new(spring));
-                    spring_ids.push(id);
-                }
+                // for mut spring in springs {
+                //     spring.bodies = spring.bodies.map(|i| point_ids.get(i));
+                //     let id = self.effector_id_pool.next();
+                //     self.effectors.insert(id, Box::new(spring));
+                //     spring_ids.push(id);
+                // }
 
                 BodyId::Soft {
                     points: point_ids,

@@ -13,7 +13,7 @@ pub enum Body {
     // Mass-spring
     Soft {
         points: Vec<LinearState>,
-        // Spring body ids are points indices
+        // Spring body ids are points indices, is this hacky?
         springs: Vec<Spring>,
     },
 }
