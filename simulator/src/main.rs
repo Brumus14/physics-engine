@@ -7,7 +7,7 @@ use bevy::{
 };
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
-    body::{AngularState, Body, BodyId, LinearState, Shape},
+    body::{AngularState, Body, LinearState, Shape},
     effector::{ConstantAcceleration, Drag, Spring},
     id_pool::Id,
     types::math::*,
@@ -69,63 +69,58 @@ fn spawn_physics_object(
     physics_world: &mut ResMut<PhysicsWorld>,
     body: Body,
     colour: Color,
-) -> BodyId {
-    let physics_id = physics_world.world.add_body(body.clone());
+) -> Id {
+    let id = physics_world.world.add_body(body.clone());
 
     match &body {
         Body::Particle { linear } => {
-            if let BodyId::Particle(id) = &physics_id {
-                commands.spawn((
-                    Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
-                    MeshMaterial2d(materials.add(colour)),
-                    Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
-                    ParticleBody(*id),
-                ));
-            }
+            commands.spawn((
+                Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
+                MeshMaterial2d(materials.add(colour)),
+                Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
+                ParticleBody(id),
+            ));
         }
         Body::Rigid {
             linear,
             angular,
             shape,
         } => {
-            if let BodyId::Rigid(id) = &physics_id {
-                commands.spawn((
-                    Mesh2d(meshes.add(shape_to_mesh(shape))),
-                    MeshMaterial2d(materials.add(colour)),
-                    Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0)
-                        .with_rotation(Quat::from_rotation_z(-angular.rotation as f32)),
-                    RigidBody(*id),
-                ));
-            }
-        }
-        Body::Soft { points, springs } => {
-            if let BodyId::Soft {
-                points: point_ids,
-                springs: spring_ids,
-            } = &physics_id
-            {
-                for (point, id) in points.iter().zip(point_ids) {
-                    commands.spawn((
-                        Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
-                        MeshMaterial2d(materials.add(colour)),
-                        Transform::from_xyz(point.position.x as f32, point.position.y as f32, 0.0),
-                        SoftBodyPoint(*id),
-                    ));
-                }
-            }
-
-            // for spring in springs {
-            //     body.spawn((
-            //         Mesh2d(meshes.add(Rectangle::new(SPRING_SIZE, 100.0))),
-            //         MeshMaterial2d(materials.add(colour)),
-            //         Transform::from_xyz(0.0, 0.0, 0.0)
-            //             .with_rotation(Quat::from_rotation_z(0.0)),
-            //     ));
-            // }
-        }
+            commands.spawn((
+                Mesh2d(meshes.add(shape_to_mesh(shape))),
+                MeshMaterial2d(materials.add(colour)),
+                Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0)
+                    .with_rotation(Quat::from_rotation_z(-angular.rotation as f32)),
+                RigidBody(id),
+            ));
+        } // Body::Soft { points, springs } => {
+          //     if let BodyId::Soft {
+          //         points: point_ids,
+          //         springs: spring_ids,
+          //     } = &physics_id
+          //     {
+          //         for (point, id) in points.iter().zip(point_ids) {
+          //             commands.spawn((
+          //                 Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
+          //                 MeshMaterial2d(materials.add(colour)),
+          //                 Transform::from_xyz(point.position.x as f32, point.position.y as f32, 0.0),
+          //                 SoftBodyPoint(*id),
+          //             ));
+          //         }
+          //     }
+          //
+          //     // for spring in springs {
+          //     //     body.spawn((
+          //     //         Mesh2d(meshes.add(Rectangle::new(SPRING_SIZE, 100.0))),
+          //     //         MeshMaterial2d(materials.add(colour)),
+          //     //         Transform::from_xyz(0.0, 0.0, 0.0)
+          //     //             .with_rotation(Quat::from_rotation_z(0.0)),
+          //     //     ));
+          //     // }
+          // }
     }
 
-    physics_id
+    id
 }
 
 fn main() {

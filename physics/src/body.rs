@@ -7,22 +7,10 @@ pub enum Body {
     },
     Rigid {
         linear: LinearState,
+        restitution: f64,
         angular: AngularState,
         shape: Shape,
     },
-    // Mass-spring
-    Soft {
-        points: Vec<LinearState>,
-        // Spring body ids are points indices, is this hacky?
-        springs: Vec<Spring>,
-    },
-}
-
-#[derive(Clone)]
-pub enum BodyId {
-    Particle(Id),
-    Rigid(Id),
-    Soft { points: Vec<Id>, springs: Vec<Id> },
 }
 
 #[derive(Clone)]
@@ -31,19 +19,15 @@ pub struct LinearState {
     pub velocity: Vector<f64>,
     pub force: Vector<f64>,
     pub mass: f64,
-    // Move to rigid?
-    pub restitution: f64,
 }
 
 impl LinearState {
-    pub fn new(position: Vector<f64>, velocity: Vector<f64>, mass: f64, restitution: f64) -> Self {
+    pub fn new(position: Vector<f64>, velocity: Vector<f64>, mass: f64) -> Self {
         Self {
             position,
             velocity,
             force: Vector::zeros(),
             mass,
-            // Should this be moved?
-            restitution,
         }
     }
 }

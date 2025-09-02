@@ -3,6 +3,7 @@ pub mod collision;
 pub mod components;
 pub mod effector;
 pub mod id_pool;
+pub mod soft_body;
 pub mod storage;
 pub mod types;
 pub mod world;

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    body::{AngularState, Body, BodyId, LinearState, Shape},
+    body::{AngularState, Body, LinearState, Shape},
     collision::CollisionPipeline,
     effector::Effector,
     id_pool::{Id, IdPool},
@@ -11,9 +11,10 @@ use crate::{
 pub struct World {
     body_id_pool: IdPool,
     linear_states: HashMap<Id, LinearState>,
+    restitutions: HashMap<Id, f64>,
     angular_states: HashMap<Id, AngularState>,
     shapes: HashMap<Id, Shape>,
-    // Is there a cleaner way?
+    body_groups: HashMap<Id, Vec<Id>>,
     effector_id_pool: IdPool,
     effectors: HashMap<Id, Box<dyn Effector + Send + Sync>>,
     collision_pipeline_id_pool: IdPool,
@@ -25,8 +26,10 @@ impl World {
         Self {
             body_id_pool: IdPool::new(),
             linear_states: HashMap::new(),
+            restitutions: HashMap::new(),
             angular_states: HashMap::new(),
             shapes: HashMap::new(),
+            body_groups: HashMap::new(),
             effector_id_pool: IdPool::new(),
             effectors: HashMap::new(),
             collision_pipeline_id_pool: IdPool::new(),
@@ -34,75 +37,64 @@ impl World {
         }
     }
 
-    pub fn add_body(&mut self, body: Body) -> BodyId {
+    pub fn add_body(&mut self, body: Body) -> Id {
         match body {
             Body::Particle { linear } => {
                 let id = self.body_id_pool.next();
                 self.linear_states.insert(id, linear);
-                BodyId::Particle(id)
+                id
             }
             Body::Rigid {
                 linear,
                 angular,
+                restitution,
                 shape,
             } => {
                 let id = self.body_id_pool.next();
                 self.linear_states.insert(id, linear);
+                self.restitutions.insert(id, restitution);
                 self.angular_states.insert(id, angular);
                 self.shapes.insert(id, shape);
-                BodyId::Rigid(id)
-            }
-            // Combine body and effector ids
-            // Or
-            // Make constraint trait instead of using effector
-            Body::Soft { points, springs } => {
-                let mut point_ids = Vec::new();
-                let mut spring_ids = Vec::new();
-
-                for point in points {
-                    let id = self.body_id_pool.next();
-                    self.linear_states.insert(id, point);
-                    point_ids.push(id);
-                }
-
-                // for mut spring in springs {
-                //     spring.bodies = spring.bodies.map(|i| point_ids.get(i));
-                //     let id = self.effector_id_pool.next();
-                //     self.effectors.insert(id, Box::new(spring));
-                //     spring_ids.push(id);
-                // }
-
-                BodyId::Soft {
-                    points: point_ids,
-                    springs: spring_ids,
-                }
-            }
+                id
+            } // // Combine body and effector ids
+              // // Or
+              // // Make constraint trait instead of using effector
+              // Body::Soft { points, springs } => {
+              //     let mut point_ids = Vec::new();
+              //     let mut spring_ids = Vec::new();
+              //
+              //     for point in points {
+              //         let id = self.body_id_pool.next();
+              //         self.linear_states.insert(id, point);
+              //         point_ids.push(id);
+              //     }
+              //
+              //     // for mut spring in springs {
+              //     //     spring.bodies = spring.bodies.map(|i| point_ids.get(i));
+              //     //     let id = self.effector_id_pool.next();
+              //     //     self.effectors.insert(id, Box::new(spring));
+              //     //     spring_ids.push(id);
+              //     // }
+              // }
         }
     }
 
-    pub fn remove_body(&mut self, id: BodyId) {
-        match id {
-            BodyId::Particle(id) => {
-                self.linear_states.remove(&id);
-                self.body_id_pool.free(id);
-            }
-            BodyId::Rigid(id) => {
-                self.linear_states.remove(&id);
-                self.angular_states.remove(&id);
-                self.shapes.remove(&id);
-                self.body_id_pool.free(id);
-            }
-            BodyId::Soft { points, springs } => {
-                for id in points {
-                    self.linear_states.remove(&id);
-                    self.body_id_pool.free(id);
-                }
+    pub fn remove_body(&mut self, id: Id) {
+        self.linear_states.remove(&id);
+        self.linear_states.remove(&id);
+        self.angular_states.remove(&id);
+        self.shapes.remove(&id);
+        self.body_id_pool.free(id);
+    }
 
-                for id in springs {
-                    self.remove_effector(id);
-                }
-            }
-        }
+    pub fn add_body_group(&mut self, ids: Vec<Id>) -> Id {
+        let id = self.body_id_pool.next();
+        self.body_groups.insert(id, ids);
+        id
+    }
+
+    pub fn remove_body_group(&mut self, group_id: Id) -> Option<Vec<Id>> {
+        self.body_groups.remove(&group_id)
     }
 
     pub fn add_effector(&mut self, effector: Box<dyn Effector + Send + Sync>) -> Id {
