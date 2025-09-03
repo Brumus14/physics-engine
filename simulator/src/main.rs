@@ -10,6 +10,7 @@ use physics::{
     body::{AngularState, Body, LinearState, Shape},
     effector::{ConstantAcceleration, Drag, Spring},
     id_pool::Id,
+    soft_body,
     types::math::*,
     world::World,
 };
@@ -23,17 +24,15 @@ struct PhysicsWorld {
     world: World,
 }
 
+// Make enum?
 #[derive(Component)]
-struct ParticleBody(Id);
+struct ParticleBodyId(Id);
 
 #[derive(Component)]
-struct RigidBody(Id);
+struct RigidBodyId(Id);
 
 #[derive(Component)]
-struct SoftBodyPoint(Id);
-
-#[derive(Component)]
-struct SoftBodySpring(Id);
+struct SpringId(Id);
 
 fn shape_to_mesh(shape: &Shape) -> Mesh {
     match shape {
@@ -62,7 +61,7 @@ fn shape_to_mesh(shape: &Shape) -> Mesh {
     }
 }
 
-fn spawn_physics_object(
+fn spawn_physics_body(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<ColorMaterial>>,
@@ -78,11 +77,12 @@ fn spawn_physics_object(
                 Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
                 MeshMaterial2d(materials.add(colour)),
                 Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
-                ParticleBody(id),
+                ParticleBodyId(id),
             ));
         }
         Body::Rigid {
             linear,
+            restitution,
             angular,
             shape,
         } => {
@@ -91,33 +91,46 @@ fn spawn_physics_object(
                 MeshMaterial2d(materials.add(colour)),
                 Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0)
                     .with_rotation(Quat::from_rotation_z(-angular.rotation as f32)),
-                RigidBody(id),
+                RigidBodyId(id),
             ));
-        } // Body::Soft { points, springs } => {
-          //     if let BodyId::Soft {
-          //         points: point_ids,
-          //         springs: spring_ids,
-          //     } = &physics_id
-          //     {
-          //         for (point, id) in points.iter().zip(point_ids) {
-          //             commands.spawn((
-          //                 Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
-          //                 MeshMaterial2d(materials.add(colour)),
-          //                 Transform::from_xyz(point.position.x as f32, point.position.y as f32, 0.0),
-          //                 SoftBodyPoint(*id),
-          //             ));
-          //         }
-          //     }
-          //
-          //     // for spring in springs {
-          //     //     body.spawn((
-          //     //         Mesh2d(meshes.add(Rectangle::new(SPRING_SIZE, 100.0))),
-          //     //         MeshMaterial2d(materials.add(colour)),
-          //     //         Transform::from_xyz(0.0, 0.0, 0.0)
-          //     //             .with_rotation(Quat::from_rotation_z(0.0)),
-          //     //     ));
-          //     // }
-          // }
+        }
+    }
+
+    id
+}
+
+fn spawn_physics_soft_body(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
+    physics_world: &mut ResMut<PhysicsWorld>,
+    points: Vec<LinearState>,
+    springs: Vec<Spring>,
+    colour: Color,
+) -> Id {
+    let id = physics_world
+        .world
+        .add_soft_body(points.clone(), springs.clone());
+    let group = physics_world.world.get_body_group(id).unwrap();
+    let point_ids = physics_world.world.get_body_group(group[0]).unwrap();
+    let spring_ids = physics_world.world.get_body_group(group[1]).unwrap();
+
+    for (linear, id) in points.iter().zip(point_ids) {
+        commands.spawn((
+            Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
+            MeshMaterial2d(materials.add(colour)),
+            Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
+            ParticleBodyId(*id),
+        ));
+    }
+
+    for (spring, id) in springs.iter().zip(spring_ids) {
+        commands.spawn((
+            Mesh2d(meshes.add(Rectangle::new(1.0, SPRING_SIZE))),
+            MeshMaterial2d(materials.add(colour)),
+            Transform::from_xyz(0.0, 0.0, 0.0).with_rotation(Quat::from_rotation_z(0.0)),
+            SpringId(*id),
+        ));
     }
 
     id
@@ -153,56 +166,73 @@ fn startup(
         }),
     ));
 
-    let rigid = spawn_physics_object(
+    // let rigid = spawn_physics_body(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::Rigid {
+    //         linear: LinearState::new(Vector::new(-150.0, -100.0), Vector::new(20.0, 0.0), 1.0),
+    //         restitution: 1.0,
+    //         angular: AngularState::new(0.0, 0.0, 1.0),
+    //         shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
+    //     },
+    //     Color::WHITE,
+    // );
+
+    let soft = spawn_physics_soft_body(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        Body::Rigid {
-            linear: LinearState::new(Vector::new(-150.0, -100.0), Vector::new(1.0, 0.0), 1.0, 1.0),
-            angular: AngularState::new(0.0, 0.0, 1.0),
-            shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
-        },
+        vec![
+            LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(50.0, 0.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(75.0, 75.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(25.0, 100.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(-75.0, 75.0), Vector::new(0.0, 0.0), 1.0),
+        ],
+        vec![
+            Spring::new([0, 1], 100.0, 100.0),
+            Spring::new([0, 2], 161.8, 100.0),
+            Spring::new([0, 3], 161.8, 100.0),
+            Spring::new([0, 4], 100.0, 100.0),
+            Spring::new([1, 2], 100.0, 100.0),
+            Spring::new([1, 3], 161.8, 100.0),
+            Spring::new([1, 4], 161.8, 100.0),
+            Spring::new([2, 3], 100.0, 100.0),
+            Spring::new([2, 4], 161.8, 100.0),
+            Spring::new([3, 4], 100.0, 100.0),
+        ],
         Color::WHITE,
     );
 
-    let soft = spawn_physics_object(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::Soft {
-            points: vec![
-                LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0, 1.0),
-                LinearState::new(Vector::new(100.0, 0.0), Vector::new(0.0, 0.0), 1.0, 1.0),
-            ],
-            springs: vec![Spring::new([0, 1], 100.0, 1.0)],
-        },
-        Color::WHITE,
-    );
+    let points = physics_world
+        .world
+        .get_soft_body_points(soft)
+        .unwrap()
+        .clone();
 
+    // cant see when higher like 0.1?????
     physics_world
         .world
-        .add_effector(Box::new(ConstantAcceleration::new(
-            vec![soft],
-            Vector::new(0.0, -20.0),
-        )));
+        .add_effector(Box::new(Drag::new(points, 0.03)));
 }
 
 fn update_physics(
     mut physics_world: ResMut<PhysicsWorld>,
     time: Res<Time>,
     mut particle_query: Query<
-        (&ParticleBody, &mut Transform),
-        (Without<RigidBody>, Without<SoftBodyPoint>),
+        (&ParticleBodyId, &mut Transform),
+        (Without<RigidBodyId>, Without<SpringId>),
     >,
     mut rigid_body_query: Query<
-        (&RigidBody, &mut Transform),
-        (Without<ParticleBody>, Without<SoftBodyPoint>),
+        (&RigidBodyId, &mut Transform),
+        (Without<ParticleBodyId>, Without<SpringId>),
     >,
-    mut soft_body_point_query: Query<
-        (&SoftBodyPoint, &mut Transform),
-        (Without<ParticleBody>, Without<RigidBody>),
+    mut spring_query: Query<
+        (&SpringId, &mut Transform),
+        (Without<ParticleBodyId>, Without<RigidBodyId>),
     >,
 ) {
     let physics_world = &mut physics_world.world;
@@ -212,7 +242,7 @@ fn update_physics(
     physics_world.handle_collisions();
 
     for (body, mut transform) in particle_query.iter_mut() {
-        let ParticleBody(id) = body;
+        let ParticleBodyId(id) = body;
 
         let position = physics_world.get_linear(*id).unwrap().position;
         transform.translation.x = position.x as f32;
@@ -220,7 +250,7 @@ fn update_physics(
     }
 
     for (body, mut transform) in rigid_body_query.iter_mut() {
-        let RigidBody(id) = body;
+        let RigidBodyId(id) = body;
 
         let position = physics_world.get_linear(*id).unwrap().position;
         transform.translation.x = position.x as f32;
@@ -230,9 +260,35 @@ fn update_physics(
         transform.rotation = Quat::from_rotation_z(-rotation as f32);
     }
 
-    // soft_body_children_query
-    //     .iter_mut()
-    //     .for_each(|(SoftBody(BodyId::Soft { points, springs }), children)| {});
+    for (body, mut transform) in spring_query.iter_mut() {
+        let SpringId(id) = body;
+
+        let spring = physics_world
+            .get_effector(*id)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<Spring>()
+            .unwrap();
+        let [a_id, b_id] = spring.bodies;
+        let (a_position, b_position) = (
+            physics_world.get_linear(a_id).unwrap().position,
+            physics_world.get_linear(b_id).unwrap().position,
+        );
+
+        let length = a_position.metric_distance(&b_position);
+        let mut rotation = (b_position.y - a_position.y).atan2(b_position.x - a_position.x);
+
+        if rotation < 0.0 {
+            rotation += std::f64::consts::TAU;
+        }
+
+        let position = a_position + (b_position - a_position) / 2.0;
+
+        transform.scale.x = length as f32;
+        transform.translation.x = position.x as f32;
+        transform.translation.y = position.y as f32;
+        transform.rotation = Quat::from_rotation_z(rotation as f32);
+    }
 }
 
 fn update() {}

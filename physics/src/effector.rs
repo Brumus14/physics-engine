@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use crate::{
     body::{AngularState, LinearState},
@@ -6,7 +6,17 @@ use crate::{
     types::math::*,
 };
 
-pub trait Effector: Send + Sync {
+pub trait AsAny {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl<T: Effector> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+pub trait Effector: Any + AsAny + Send + Sync {
     fn apply(
         &self,
         linear_states: &mut HashMap<Id, LinearState>,

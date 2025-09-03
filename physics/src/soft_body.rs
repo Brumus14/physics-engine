@@ -11,7 +11,7 @@ pub struct SoftBody {
 }
 
 impl World {
-    fn add_soft_body(&mut self, points: Vec<LinearState>, springs: Vec<Spring>) -> Id {
+    pub fn add_soft_body(&mut self, points: Vec<LinearState>, springs: Vec<Spring>) -> Id {
         let mut point_ids: Vec<Id> = Vec::new();
         let mut spring_ids: Vec<Id> = Vec::new();
 
@@ -19,7 +19,8 @@ impl World {
             point_ids.push(self.add_body(Body::Particle { linear }));
         }
 
-        for spring in springs {
+        for mut spring in springs {
+            spring.bodies = spring.bodies.map(|b| point_ids[b]);
             spring_ids.push(self.add_effector(Box::new(spring)));
         }
 
@@ -28,7 +29,15 @@ impl World {
         self.add_body_group(vec![points_group, springs_group])
     }
 
-    fn remove_soft_body(&mut self, id: Id) -> Option<Vec<Id>> {
+    pub fn remove_soft_body(&mut self, id: Id) -> Option<Vec<Id>> {
         self.remove_body_group(id)
+    }
+
+    pub fn get_soft_body_points(&self, id: Id) -> Option<&Vec<Id>> {
+        self.get_body_group(self.get_body_group(id)?[0])
+    }
+
+    pub fn get_soft_body_springs(&self, id: Id) -> Option<&Vec<Id>> {
+        self.get_body_group(self.get_body_group(id)?[1])
     }
 }

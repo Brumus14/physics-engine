@@ -20,13 +20,15 @@ impl CollisionPipeline for DefaultCollisionPipeline {
     fn handle(
         &mut self,
         linear_states: &mut HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
         angular_states: &mut HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) {
         let collisions = self
             .detector
             .detect(&self.bodies, linear_states, angular_states, shapes);
-        self.resolver.resolve(collisions, linear_states, shapes);
+        self.resolver
+            .resolve(collisions, linear_states, restitutions, shapes);
     }
 }
 
@@ -238,6 +240,7 @@ impl CollisionResolution for DefaultCollisionResolver {
         &mut self,
         collisions: Vec<CollisionData>,
         linear_states: &mut HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
         shapes: &HashMap<Id, Shape>,
     ) {
         for collision in collisions {
@@ -246,8 +249,12 @@ impl CollisionResolution for DefaultCollisionResolver {
             let [a_linear, b_linear] = linear_states.get_disjoint_mut([&a_id, &b_id]);
             let a_linear = a_linear.unwrap();
             let b_linear = b_linear.unwrap();
+            let [a_restitution, b_restitution] = [
+                restitutions.get(&a_id).unwrap(),
+                restitutions.get(&b_id).unwrap(),
+            ];
 
-            let impulse = -(1.0 + a_linear.restitution * b_linear.restitution)
+            let impulse = -(1.0 + *a_restitution * *b_restitution)
                 * (a_linear.velocity - b_linear.velocity).dot(&collision.normal)
                 / (1.0 / a_linear.mass + 1.0 / b_linear.mass);
 

@@ -9,6 +9,7 @@ pub trait CollisionPipeline {
     fn handle(
         &mut self,
         linear_states: &mut HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
         angular_states: &mut HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     );
@@ -45,6 +46,7 @@ pub trait CollisionResolution {
         &mut self,
         collisions: Vec<CollisionData>,
         linear_states: &mut HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
         shapes: &HashMap<Id, Shape>,
     );
 }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
@@ -93,8 +93,12 @@ impl World {
         id
     }
 
-    pub fn remove_body_group(&mut self, group_id: Id) -> Option<Vec<Id>> {
-        self.body_groups.remove(&group_id)
+    pub fn remove_body_group(&mut self, id: Id) -> Option<Vec<Id>> {
+        self.body_groups.remove(&id)
+    }
+
+    pub fn get_body_group(&self, id: Id) -> Option<&Vec<Id>> {
+        self.body_groups.get(&id)
     }
 
     pub fn add_effector(&mut self, effector: Box<dyn Effector + Send + Sync>) -> Id {
@@ -106,6 +110,10 @@ impl World {
     pub fn remove_effector(&mut self, id: Id) {
         self.effectors.remove(&id);
         self.body_id_pool.free(id);
+    }
+
+    pub fn get_effector(&mut self, id: Id) -> Option<&Box<dyn Effector + Send + Sync>> {
+        self.effectors.get(&id)
     }
 
     pub fn add_collision_pipeline(
@@ -146,6 +154,7 @@ impl World {
         for pipeline in self.collision_pipelines.values_mut() {
             pipeline.handle(
                 &mut self.linear_states,
+                &self.restitutions,
                 &mut self.angular_states,
                 &self.shapes,
             );
