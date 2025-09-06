@@ -10,7 +10,7 @@ use physics::{
     body::{AngularState, Body, LinearState, Shape},
     effector::{ConstantAcceleration, Drag, Spring},
     id_pool::Id,
-    soft_body,
+    soft_body::{self, SoftBodySpring},
     types::math::*,
     world::World,
 };
@@ -72,7 +72,7 @@ fn spawn_physics_body(
     let id = physics_world.world.add_body(body.clone());
 
     match &body {
-        Body::Particle { linear } => {
+        Body::Point { linear } => {
             commands.spawn((
                 Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
                 MeshMaterial2d(materials.add(colour)),
@@ -105,7 +105,7 @@ fn spawn_physics_soft_body(
     materials: &mut ResMut<Assets<ColorMaterial>>,
     physics_world: &mut ResMut<PhysicsWorld>,
     points: Vec<LinearState>,
-    springs: Vec<Spring>,
+    springs: Vec<SoftBodySpring>,
     colour: Color,
 ) -> Id {
     let id = physics_world
@@ -186,23 +186,37 @@ fn startup(
         &mut materials,
         &mut physics_world,
         vec![
-            LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(50.0, 0.0), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(75.0, 75.0), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(25.0, 100.0), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(-75.0, 75.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(0.0, 100.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(95.10565, 30.9017), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(58.778525, -80.9017), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(
+                Vector::new(-58.778525, -80.9017),
+                Vector::new(0.0, 0.0),
+                1.0,
+            ),
+            LinearState::new(Vector::new(-95.10565, 30.9017), Vector::new(0.0, 0.0), 1.0),
         ],
         vec![
-            Spring::new([0, 1], 100.0, 100.0),
-            Spring::new([0, 2], 161.8, 100.0),
-            Spring::new([0, 3], 161.8, 100.0),
-            Spring::new([0, 4], 100.0, 100.0),
-            Spring::new([1, 2], 100.0, 100.0),
-            Spring::new([1, 3], 161.8, 100.0),
-            Spring::new([1, 4], 161.8, 100.0),
-            Spring::new([2, 3], 100.0, 100.0),
-            Spring::new([2, 4], 161.8, 100.0),
-            Spring::new([3, 4], 100.0, 100.0),
+            SoftBodySpring::new_auto_length([0, 1], 1.0),
+            SoftBodySpring::new_auto_length([0, 2], 1.0),
+            SoftBodySpring::new_auto_length([0, 3], 1.0),
+            SoftBodySpring::new_auto_length([0, 4], 1.0),
+            SoftBodySpring::new_auto_length([1, 2], 1.0),
+            SoftBodySpring::new_auto_length([1, 3], 1.0),
+            SoftBodySpring::new_auto_length([1, 4], 1.0),
+            SoftBodySpring::new_auto_length([2, 3], 1.0),
+            SoftBodySpring::new_auto_length([2, 4], 1.0),
+            SoftBodySpring::new_auto_length([3, 4], 1.0),
+            // Spring::new([0, 1], 100.0, 100.0),
+            // Spring::new([0, 2], 161.8, 100000.0),
+            // Spring::new([0, 3], 161.8, 100000.0),
+            // Spring::new([0, 4], 100.0, 100000.0),
+            // Spring::new([1, 2], 100.0, 100000.0),
+            // Spring::new([1, 3], 161.8, 100000.0),
+            // Spring::new([1, 4], 161.8, 100000.0),
+            // Spring::new([2, 3], 100.0, 100000.0),
+            // Spring::new([2, 4], 161.8, 100000.0),
+            // Spring::new([3, 4], 100.0, 100000.0),
         ],
         Color::WHITE,
     );
@@ -216,7 +230,7 @@ fn startup(
     // cant see when higher like 0.1?????
     physics_world
         .world
-        .add_effector(Box::new(Drag::new(points, 0.03)));
+        .add_effector(Box::new(Drag::new(points, 0.1)));
 }
 
 fn update_physics(

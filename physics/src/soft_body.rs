@@ -10,17 +10,51 @@ pub struct SoftBody {
     pub springs: Vec<Id>,
 }
 
+#[derive(Clone)]
+pub struct SoftBodySpring {
+    pub body_indices: [usize; 2],
+    pub length: Option<f64>,
+    pub elasticity: f64,
+}
+
+impl SoftBodySpring {
+    pub fn new(body_indices: [usize; 2], length: f64, elasticity: f64) -> Self {
+        Self {
+            body_indices,
+            length: Some(length),
+            elasticity,
+        }
+    }
+
+    pub fn new_auto_length(body_indices: [usize; 2], elasticity: f64) -> Self {
+        Self {
+            body_indices,
+            length: None,
+            elasticity,
+        }
+    }
+}
+
 impl World {
-    pub fn add_soft_body(&mut self, points: Vec<LinearState>, springs: Vec<Spring>) -> Id {
+    pub fn add_soft_body(&mut self, points: Vec<LinearState>, springs: Vec<SoftBodySpring>) -> Id {
         let mut point_ids: Vec<Id> = Vec::new();
         let mut spring_ids: Vec<Id> = Vec::new();
 
-        for linear in points {
-            point_ids.push(self.add_body(Body::Particle { linear }));
+        for linear in points.clone() {
+            point_ids.push(self.add_body(Body::Point { linear }));
         }
 
-        for mut spring in springs {
-            spring.bodies = spring.bodies.map(|b| point_ids[b]);
+        for spring in springs {
+            let bodies = spring.body_indices.map(|b| point_ids[b]);
+            let length = spring.length.unwrap_or_else(|| {
+                let (a_position, b_position) = (
+                    points[spring.body_indices[0]].position,
+                    points[spring.body_indices[1]].position,
+                );
+                a_position.metric_distance(&b_position)
+            });
+
+            let spring = Spring::new(bodies, length, spring.elasticity);
             spring_ids.push(self.add_effector(Box::new(spring)));
         }
 

@@ -2,7 +2,8 @@ use crate::{effector::Spring, id_pool::Id, types::math::*};
 
 #[derive(Clone)]
 pub enum Body {
-    Particle {
+    // Particle {
+    Point {
         linear: LinearState,
     },
     Rigid {
