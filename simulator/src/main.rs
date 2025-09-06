@@ -197,16 +197,16 @@ fn startup(
             LinearState::new(Vector::new(-95.10565, 30.9017), Vector::new(0.0, 0.0), 1.0),
         ],
         vec![
-            SoftBodySpring::new_auto_length([0, 1], 1.0),
-            SoftBodySpring::new_auto_length([0, 2], 1.0),
-            SoftBodySpring::new_auto_length([0, 3], 1.0),
-            SoftBodySpring::new_auto_length([0, 4], 1.0),
-            SoftBodySpring::new_auto_length([1, 2], 1.0),
-            SoftBodySpring::new_auto_length([1, 3], 1.0),
-            SoftBodySpring::new_auto_length([1, 4], 1.0),
-            SoftBodySpring::new_auto_length([2, 3], 1.0),
-            SoftBodySpring::new_auto_length([2, 4], 1.0),
-            SoftBodySpring::new_auto_length([3, 4], 1.0),
+            SoftBodySpring::new_auto_length([0, 1], 3.0),
+            SoftBodySpring::new_auto_length([0, 2], 3.0),
+            SoftBodySpring::new_auto_length([0, 3], 3.0),
+            SoftBodySpring::new_auto_length([0, 4], 3.0),
+            SoftBodySpring::new_auto_length([1, 2], 3.0),
+            SoftBodySpring::new_auto_length([1, 3], 3.0),
+            SoftBodySpring::new_auto_length([1, 4], 3.0),
+            SoftBodySpring::new_auto_length([2, 3], 3.0),
+            SoftBodySpring::new_auto_length([2, 4], 3.0),
+            SoftBodySpring::new_auto_length([3, 4], 3.0),
             // Spring::new([0, 1], 100.0, 100.0),
             // Spring::new([0, 2], 161.8, 100000.0),
             // Spring::new([0, 3], 161.8, 100000.0),
@@ -227,10 +227,16 @@ fn startup(
         .unwrap()
         .clone();
 
-    // cant see when higher like 0.1?????
     physics_world
         .world
-        .add_effector(Box::new(Drag::new(points, 0.1)));
+        .add_effector(Box::new(Drag::new(points.clone(), 0.1)));
+
+    physics_world
+        .world
+        .add_effector(Box::new(ConstantAcceleration::new(
+            vec![points[0]],
+            Vector::new(-400.0, 0.0),
+        )));
 }
 
 fn update_physics(

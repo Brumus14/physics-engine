@@ -39,7 +39,7 @@ impl World {
 
     pub fn add_body(&mut self, body: Body) -> Id {
         match body {
-            Body::Particle { linear } => {
+            Body::Point { linear } => {
                 let id = self.body_id_pool.next();
                 self.linear_states.insert(id, linear);
                 id

@@ -51,7 +51,7 @@ impl World {
                     points[spring.body_indices[0]].position,
                     points[spring.body_indices[1]].position,
                 );
-                a_position.metric_distance(&b_position)
+                a_position.metric_distance(&b_position) * 0.9
             });
 
             let spring = Spring::new(bodies, length, spring.elasticity);
