@@ -8,6 +8,7 @@ use bevy::{
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     body::{AngularState, Body, LinearState, Shape},
+    collision::default::DefaultCollisionPipeline,
     effector::{ConstantAcceleration, Drag, Spring},
     id_pool::Id,
     soft_body::{self, SoftBodySpring},
@@ -166,77 +167,37 @@ fn startup(
         }),
     ));
 
-    // let rigid = spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(Vector::new(-150.0, -100.0), Vector::new(20.0, 0.0), 1.0),
-    //         restitution: 1.0,
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
-    //     },
-    //     Color::WHITE,
-    // );
-
-    let soft = spawn_physics_soft_body(
+    let a = spawn_physics_body(
         &mut commands,
         &mut meshes,
         &mut materials,
         &mut physics_world,
-        vec![
-            LinearState::new(Vector::new(0.0, 100.0), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(95.10565, 30.9017), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(Vector::new(58.778525, -80.9017), Vector::new(0.0, 0.0), 1.0),
-            LinearState::new(
-                Vector::new(-58.778525, -80.9017),
-                Vector::new(0.0, 0.0),
-                1.0,
-            ),
-            LinearState::new(Vector::new(-95.10565, 30.9017), Vector::new(0.0, 0.0), 1.0),
-        ],
-        vec![
-            SoftBodySpring::new_auto_length([0, 1], 3.0),
-            SoftBodySpring::new_auto_length([0, 2], 3.0),
-            SoftBodySpring::new_auto_length([0, 3], 3.0),
-            SoftBodySpring::new_auto_length([0, 4], 3.0),
-            SoftBodySpring::new_auto_length([1, 2], 3.0),
-            SoftBodySpring::new_auto_length([1, 3], 3.0),
-            SoftBodySpring::new_auto_length([1, 4], 3.0),
-            SoftBodySpring::new_auto_length([2, 3], 3.0),
-            SoftBodySpring::new_auto_length([2, 4], 3.0),
-            SoftBodySpring::new_auto_length([3, 4], 3.0),
-            // Spring::new([0, 1], 100.0, 100.0),
-            // Spring::new([0, 2], 161.8, 100000.0),
-            // Spring::new([0, 3], 161.8, 100000.0),
-            // Spring::new([0, 4], 100.0, 100000.0),
-            // Spring::new([1, 2], 100.0, 100000.0),
-            // Spring::new([1, 3], 161.8, 100000.0),
-            // Spring::new([1, 4], 161.8, 100000.0),
-            // Spring::new([2, 3], 100.0, 100000.0),
-            // Spring::new([2, 4], 161.8, 100000.0),
-            // Spring::new([3, 4], 100.0, 100000.0),
-        ],
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
+            restitution: 1.0,
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
+        },
         Color::WHITE,
     );
 
-    let points = physics_world
-        .world
-        .get_soft_body_points(soft)
-        .unwrap()
-        .clone();
+    let b = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(75.0, -100.0), Vector::new(0.0, 20.0), 1.0),
+            restitution: 1.0,
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
+        },
+        Color::WHITE,
+    );
 
     physics_world
         .world
-        .add_effector(Box::new(Drag::new(points.clone(), 0.1)));
-
-    physics_world
-        .world
-        .add_effector(Box::new(ConstantAcceleration::new(
-            vec![points[0]],
-            Vector::new(-400.0, 0.0),
-        )));
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![a, b])));
 }
 
 fn update_physics(

@@ -127,17 +127,17 @@ impl NarrowPhase for DefaultNarrowPhase {
                     _ => None,
                 },
                 Shape::Rectangle(a_size) => match b_shape {
-                    Shape::Rectangle(b_size) => DefaultNarrowPhase::detect_rectangle_rectangle(
-                        pair[0],
-                        pair[1],
-                        a_size,
-                        b_size,
-                        // Reference or not
-                        &a_linear.position,
-                        &b_linear.position,
-                        a_angular.rotation,
-                        b_angular.rotation,
-                    ),
+                    // Shape::Rectangle(b_size) => DefaultNarrowPhase::detect_rectangle_rectangle(
+                    //     pair[0],
+                    //     pair[1],
+                    //     a_size,
+                    //     b_size,
+                    //     // Reference or not
+                    //     &a_linear.position,
+                    //     &b_linear.position,
+                    //     a_angular.rotation,
+                    //     b_angular.rotation,
+                    // ),
                     _ => None,
                 },
                 _ => None,
@@ -180,34 +180,31 @@ impl DefaultNarrowPhase {
         }
     }
 
-    pub fn detect_rectangle_rectangle(
+    // Separating Axis Theorem (SAT)
+    pub fn detect_sat(
         a_id: Id,
         b_id: Id,
-        a_size: &Vector<f64>,
-        b_size: &Vector<f64>,
-        a_position: &Vector<f64>,
-        b_position: &Vector<f64>,
-        a_rotation: f64,
-        b_rotation: f64,
+        a_points: Vec<Vector<f64>>,
+        b_points: Vec<Vector<f64>>,
     ) -> Option<CollisionData> {
-        let a_points = [
-            -a_size / 2.0,
-            Vector::new(a_size.x, -a_size.y) / 2.0,
-            a_size / 2.0,
-            Vector::new(-a_size.x, a_size.y) / 2.0,
-        ];
-        let b_points = [
-            -b_size / 2.0,
-            Vector::new(b_size.x, -b_size.y) / 2.0,
-            b_size / 2.0,
-            Vector::new(-b_size.x, b_size.y) / 2.0,
-        ];
-        let axes = [
-            Vector::new(a_rotation.cos(), a_rotation.sin()),
-            Vector::new(a_rotation.sin(), -a_rotation.cos()),
-            Vector::new(b_rotation.cos(), b_rotation.sin()),
-            Vector::new(b_rotation.sin(), -b_rotation.cos()),
-        ];
+        let mut axes: Vec<Vector<f64>> = Vec::new();
+
+        for i in 0..a_points.len() {
+            // should be perpendicular to points
+            let axis = (a_points[i] - a_points[(i + 1) % a_points.len()]).normalize();
+
+            // use constant
+            // only use for big polygons?
+            if axes.iter().any(|a| axis.dot(a).abs() > 0.999) {
+                continue;
+            }
+
+            axes.push(axis);
+        }
+
+        for i in 0..b_points.len() {
+            axes.push((b_points[i] - b_points[i + 1 % b_points.len()]).normalize());
+        }
 
         // for i in axes.len() {
         //     (a_position + Rotation::new(a_rotation) * a_points[i])
