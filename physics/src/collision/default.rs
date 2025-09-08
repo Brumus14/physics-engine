@@ -1,3 +1,7 @@
+use std::f64;
+
+use uom::si::thermal_conductivity::attogram_meter_per_second_cubed_kelvin;
+
 use crate::collision::*;
 
 pub struct DefaultCollisionPipeline {
@@ -187,14 +191,16 @@ impl DefaultNarrowPhase {
         a_points: Vec<Vector<f64>>,
         b_points: Vec<Vector<f64>>,
     ) -> Option<CollisionData> {
+        // Pass in axes maybe
         let mut axes: Vec<Vector<f64>> = Vec::new();
 
         for i in 0..a_points.len() {
-            // should be perpendicular to points
-            let axis = (a_points[i] - a_points[(i + 1) % a_points.len()]).normalize();
+            let line = (a_points[(i + 1) % a_points.len()] - a_points[i]).normalize();
+            let axis = Vector::new(-line.y, line.x);
 
             // use constant
             // only use for big polygons?
+            // or just push all?
             if axes.iter().any(|a| axis.dot(a).abs() > 0.999) {
                 continue;
             }
@@ -203,17 +209,54 @@ impl DefaultNarrowPhase {
         }
 
         for i in 0..b_points.len() {
-            axes.push((b_points[i] - b_points[i + 1 % b_points.len()]).normalize());
+            let line = (b_points[(i + 1) % b_points.len()] - b_points[i]).normalize();
+            let axis = Vector::new(-line.y, line.x);
+
+            if axes.iter().any(|b| axis.dot(b).abs() > 0.999) {
+                continue;
+            }
+
+            axes.push(axis);
         }
 
-        // for i in axes.len() {
-        //     (a_position + Rotation::new(a_rotation) * a_points[i])
-        // }
-        // let a_min;
-        // let a_max;
-        // let projected = point.dot(&axis);
-        // println!("{}", projected);
+        for axis in &axes {
+            let mut min_penetration = f64::INFINITY;
+            let mut a_min = f64::INFINITY;
+            let mut a_max = f64::NEG_INFINITY;
+            let mut b_min = f64::INFINITY;
+            let mut b_max = f64::NEG_INFINITY;
 
+            for point in &a_points {
+                let value = point.dot(axis);
+
+                if value < a_min {
+                    a_min = value;
+                }
+
+                if value > a_max {
+                    a_max = value;
+                }
+            }
+
+            for point in &b_points {
+                let value = point.dot(axis);
+
+                if value < b_min {
+                    b_min = value;
+                }
+
+                if value > b_max {
+                    b_max = value;
+                }
+            }
+
+            if b_min >= a_max || b_max <= a_min {
+                return None;
+            } else {
+            }
+        }
+
+        println!("COLIIIIIIISION");
         None
     }
 }

@@ -8,7 +8,7 @@ use bevy::{
 use i_triangle::float::triangulatable::Triangulatable;
 use physics::{
     body::{AngularState, Body, LinearState, Shape},
-    collision::default::DefaultCollisionPipeline,
+    collision::default::{DefaultCollisionPipeline, DefaultNarrowPhase},
     effector::{ConstantAcceleration, Drag, Spring},
     id_pool::Id,
     soft_body::{self, SoftBodySpring},
@@ -198,6 +198,21 @@ fn startup(
     physics_world
         .world
         .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![a, b])));
+
+    DefaultNarrowPhase::detect_sat(
+        0,
+        1,
+        vec![
+            Vector::new(0.0, 0.0),
+            Vector::new(2.0, 0.0),
+            Vector::new(1.0, 1.0),
+        ],
+        vec![
+            Vector::new(1.9, 0.0),
+            Vector::new(3.0, 0.0),
+            Vector::new(2.0, 3.0),
+        ],
+    );
 }
 
 fn update_physics(
