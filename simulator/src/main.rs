@@ -173,9 +173,9 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::Rigid {
-            linear: LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
+            linear: LinearState::new(Vector::new(400.0, 0.0), Vector::new(-40.0, -20.0), 1.0),
             restitution: 1.0,
-            angular: AngularState::new(0.0, 0.0, 1.0),
+            angular: AngularState::new(f64::consts::PI / 4.0, 0.0, 1.0),
             shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
         },
         Color::WHITE,
@@ -187,32 +187,72 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::Rigid {
-            linear: LinearState::new(Vector::new(75.0, -100.0), Vector::new(0.0, 20.0), 1.0),
+            linear: LinearState::new(Vector::new(-300.0, 50.0), Vector::new(100.0, 0.0), 1.0),
             restitution: 1.0,
-            angular: AngularState::new(0.0, 0.0, 1.0),
+            angular: AngularState::new(-f64::consts::PI / 4.0, 0.0, 1.0),
             shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
+        },
+        Color::WHITE,
+    );
+
+    let c = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(40.0, 400.0), Vector::new(0.0, 0.0), 1.0),
+            restitution: 1.0,
+            angular: AngularState::new(-f64::consts::PI / 20.0, 0.0, 1.0),
+            shape: Shape::Rectangle(Vector::new(200.0, 25.0)),
+        },
+        Color::WHITE,
+    );
+
+    let ground = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::Rigid {
+            linear: LinearState::new(
+                Vector::new(100.0, -200.0),
+                Vector::new(0.0, 0.0),
+                f64::INFINITY,
+            ),
+            restitution: 0.0,
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Rectangle(Vector::new(1000.0, 50.0)),
+        },
+        Color::WHITE,
+    );
+
+    let wall = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::Rigid {
+            linear: LinearState::new(Vector::new(0.0, 60.0), Vector::new(0.0, 0.0), f64::INFINITY),
+            restitution: 0.0,
+            angular: AngularState::new(0.0, 0.0, 1.0),
+            shape: Shape::Rectangle(Vector::new(100.0, 300.0)),
         },
         Color::WHITE,
     );
 
     physics_world
         .world
-        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![a, b])));
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(vec![
+            a, b, c, wall, ground,
+        ])));
 
-    DefaultNarrowPhase::detect_sat(
-        0,
-        1,
-        vec![
-            Vector::new(0.0, 0.0),
-            Vector::new(2.0, 0.0),
-            Vector::new(1.0, 1.0),
-        ],
-        vec![
-            Vector::new(1.9, 0.0),
-            Vector::new(3.0, 0.0),
-            Vector::new(2.0, 3.0),
-        ],
-    );
+    physics_world
+        .world
+        .add_effector(Box::new(ConstantAcceleration::new(
+            vec![a, b, c],
+            Vector::new(0.0, -100.0),
+        )));
 }
 
 fn update_physics(
