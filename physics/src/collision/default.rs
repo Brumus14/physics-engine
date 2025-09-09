@@ -1,7 +1,5 @@
 use std::f64;
 
-use uom::si::inverse_velocity::minute_per_foot;
-
 use crate::collision::*;
 
 pub struct DefaultCollisionPipeline {
@@ -13,19 +11,33 @@ pub struct DefaultCollisionPipeline {
 impl DefaultCollisionPipeline {
     pub fn new(bodies: Vec<Id>) -> Self {
         Self {
-            bodies,
-            detector: DefaultCollisionDetector::new(),
+            bodies: bodies.clone(),
+            // Clone bodies?
+            detector: DefaultCollisionDetector::new(&bodies),
             resolver: DefaultCollisionResolver::new(),
         }
     }
 }
 
 impl CollisionPipeline for DefaultCollisionPipeline {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    ) {
+        self.detector
+            .init(linear_states, restitutions, angular_states, shapes);
+        self.resolver
+            .init(linear_states, restitutions, angular_states, shapes);
+    }
+
     fn handle(
         &mut self,
         linear_states: &mut HashMap<Id, LinearState>,
         restitutions: &HashMap<Id, f64>,
-        angular_states: &mut HashMap<Id, AngularState>,
+        angular_states: &HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) {
         let collisions = self
@@ -42,15 +54,28 @@ pub struct DefaultCollisionDetector {
 }
 
 impl DefaultCollisionDetector {
-    pub fn new() -> Self {
+    pub fn new(bodies: &Vec<Id>) -> Self {
         Self {
-            broad_phase: DefaultBroadPhase::new(),
+            broad_phase: DefaultBroadPhase::new(bodies.clone()),
             narrow_phase: DefaultNarrowPhase::new(),
         }
     }
 }
 
 impl CollisionDetection for DefaultCollisionDetector {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    ) {
+        self.broad_phase
+            .init(linear_states, restitutions, angular_states, shapes);
+        self.narrow_phase
+            .init(linear_states, restitutions, angular_states, shapes);
+    }
+
     fn detect(
         &mut self,
         bodies: &Vec<Id>,
@@ -58,27 +83,74 @@ impl CollisionDetection for DefaultCollisionDetector {
         angular_states: &HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     ) -> Vec<CollisionData> {
-        let body_pairs = self.broad_phase.cull(bodies);
+        let body_pairs = self.broad_phase.cull(bodies, linear_states);
         self.narrow_phase
             .detect(bodies, body_pairs, linear_states, angular_states, shapes)
     }
 }
 
-pub struct DefaultBroadPhase {}
+pub struct DefaultBroadPhase {
+    bodies: Vec<Id>,
+    circles: HashMap<Id, f64>,
+}
 
 impl DefaultBroadPhase {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(bodies: Vec<Id>) -> Self {
+        Self {
+            bodies,
+            circles: HashMap::new(),
+        }
     }
 }
 
 impl BroadPhase for DefaultBroadPhase {
-    fn cull(&mut self, bodies: &Vec<Id>) -> Vec<[Id; 2]> {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    ) {
+        for body in &self.bodies {
+            if let Some(shape) = shapes.get(body) {
+                match shape {
+                    Shape::Circle(radius) => {
+                        self.circles.insert(*body, *radius);
+                    }
+                    Shape::Rectangle(size) => {
+                        let radius = ((size.x / 2.0).powi(2) + (size.y / 2.0).powi(2)).sqrt();
+                        self.circles.insert(*body, radius);
+                    }
+                    Shape::Polygon(points) => {
+                        let mut max_radius: f64 = 0.0;
+
+                        for point in points {
+                            max_radius = max_radius.max(point.magnitude());
+                        }
+
+                        self.circles.insert(*body, max_radius);
+                    }
+                }
+            }
+        }
+    }
+
+    fn cull(&mut self, bodies: &Vec<Id>, linear_states: &HashMap<Id, LinearState>) -> Vec<[Id; 2]> {
         let mut pairs = Vec::new();
 
         for i in 0..bodies.len() {
             for j in (i + 1)..bodies.len() {
-                pairs.push([bodies[i], bodies[j]]);
+                let (a_position, b_position) = (
+                    linear_states.get(&bodies[i]).unwrap().position,
+                    linear_states.get(&bodies[j]).unwrap().position,
+                );
+                let distance = b_position.metric_distance(&a_position);
+
+                if distance
+                    < self.circles.get(&bodies[i]).unwrap() + self.circles.get(&bodies[j]).unwrap()
+                {
+                    pairs.push([bodies[i], bodies[j]]);
+                }
             }
         }
 
@@ -97,6 +169,15 @@ impl DefaultNarrowPhase {
 }
 
 impl NarrowPhase for DefaultNarrowPhase {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    ) {
+    }
+
     fn detect(
         &mut self,
         _bodies: &Vec<Id>,
@@ -171,6 +252,21 @@ impl NarrowPhase for DefaultNarrowPhase {
                     ),
                     _ => None,
                 },
+                // Shape::Polygon(a_points) => match b_shape {
+                //     Shape::Polygon(b_points) => DefaultNarrowPhase::detect_sat(
+                //         pair[0],
+                //         pair[1],
+                //         a_points,
+                //         b_points,
+                //         a_linear.position,
+                //         b_linear.position,
+                //         a_normals,
+                //         b_normals,
+                //         a_angular.rotation,
+                //         b_angular.rotation,
+                //     ),
+                //     _ => None,
+                // },
                 _ => None,
             } {
                 self.collisions += 1;
@@ -315,6 +411,15 @@ impl DefaultCollisionResolver {
 }
 
 impl CollisionResolution for DefaultCollisionResolver {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    ) {
+    }
+
     fn resolve(
         &mut self,
         collisions: Vec<CollisionData>,

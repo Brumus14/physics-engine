@@ -118,8 +118,15 @@ impl World {
 
     pub fn add_collision_pipeline(
         &mut self,
-        collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
+        mut collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
     ) -> Id {
+        collision_pipeline.init(
+            &self.linear_states,
+            &self.restitutions,
+            &self.angular_states,
+            &self.shapes,
+        );
+
         let id = self.collision_pipeline_id_pool.next();
         self.collision_pipelines.insert(id, collision_pipeline);
         id
@@ -137,6 +144,7 @@ impl World {
     }
 
     pub fn step(&mut self, delta_time: f64) {
+        // Add integrators
         for linear in self.linear_states.values_mut() {
             linear.velocity += (linear.force / linear.mass) * delta_time;
             linear.position += linear.velocity * delta_time;
@@ -144,6 +152,11 @@ impl World {
         }
 
         for angular in self.angular_states.values_mut() {
+            // Is this dodgy
+            if angular.inertia == 0.0 {
+                continue;
+            }
+
             angular.velocity += (angular.torque / angular.inertia) * delta_time;
             angular.rotation += angular.velocity * delta_time;
             angular.torque = 0.0;

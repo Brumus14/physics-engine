@@ -58,3 +58,25 @@ pub enum Shape {
     Rectangle(Vector<f64>),
     Polygon(Vec<Vector<f64>>),
 }
+
+// #[derive(Clone)]
+// pub enum Shape {
+//     Circle(f64),
+//     Polygon {
+//         points: Vec<Vector<f64>>,
+//         normals: Vec<Vector<f64>>,
+//     },
+// }
+//
+// impl Shape {
+//     pub fn new_circle(radius: f64) -> Self {
+//         Shape::Circle(radius)
+//     }
+//
+//     // pub fn new_rectangle(size: Vector<f64>) -> Self {
+//     //     Shape::Polygon {
+//     //         points: vec![],
+//     //         normals: (),
+//     //     }
+//     // }
+// }

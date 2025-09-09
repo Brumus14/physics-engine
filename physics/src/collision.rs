@@ -6,16 +6,32 @@ use crate::types::math::*;
 use std::collections::HashMap;
 
 pub trait CollisionPipeline {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+
     fn handle(
         &mut self,
         linear_states: &mut HashMap<Id, LinearState>,
         restitutions: &HashMap<Id, f64>,
-        angular_states: &mut HashMap<Id, AngularState>,
+        angular_states: &HashMap<Id, AngularState>,
         shapes: &HashMap<Id, Shape>,
     );
 }
 
 pub trait CollisionDetection {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+
     fn detect(
         &mut self,
         bodies: &Vec<Id>,
@@ -26,11 +42,28 @@ pub trait CollisionDetection {
 }
 
 pub trait BroadPhase {
+    // Remove into another trait
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+
     // Better name
-    fn cull(&mut self, bodies: &Vec<Id>) -> Vec<[Id; 2]>;
+    fn cull(&mut self, bodies: &Vec<Id>, linear_states: &HashMap<Id, LinearState>) -> Vec<[Id; 2]>;
 }
 
 pub trait NarrowPhase {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+
     fn detect(
         &mut self,
         bodies: &Vec<Id>,
@@ -42,6 +75,14 @@ pub trait NarrowPhase {
 }
 
 pub trait CollisionResolution {
+    fn init(
+        &mut self,
+        linear_states: &HashMap<Id, LinearState>,
+        restitutions: &HashMap<Id, f64>,
+        angular_states: &HashMap<Id, AngularState>,
+        shapes: &HashMap<Id, Shape>,
+    );
+
     fn resolve(
         &mut self,
         collisions: Vec<CollisionData>,
