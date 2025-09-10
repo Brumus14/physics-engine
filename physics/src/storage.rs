@@ -1,3 +1,5 @@
+use std::collections::{BinaryHeap, HashSet, binary_heap};
+
 use crate::id_pool::{Id, IdPool};
 
 pub struct Storage<T> {
@@ -16,21 +18,33 @@ impl<T> Storage<T> {
     pub fn add(&mut self, item: T) -> Id {
         let id = self.id_pool.next();
 
-        if let Some(additional) = id.checked_sub(self.items.len()) {
-            self.items.reserve(additional);
+        // Pool has grown
+        if id == self.id_pool.max() {
+            self.items.push(Some(item));
+        } else {
+            self.items[id] = Some(item);
         }
 
-        self.items[id] = Some(item);
         id
     }
 
     pub fn remove(&mut self, id: Id) {
-        if self.id_pool.free(id) {
-            self.items.pop();
+        if id > self.id_pool.max() {
+            return;
         }
 
-        if let Some(item) = self.items.get_mut(id) {
-            *item = None;
+        // Pool has shrunk
+        if id == self.id_pool.max() {
+            self.items.pop();
+
+            // Remove trailing empty items
+            while matches!(self.items.last(), Some(None)) {
+                self.items.pop();
+            }
+        } else {
+            self.items[id] = None;
         }
+
+        self.id_pool.free(id);
     }
 }

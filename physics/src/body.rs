@@ -1,17 +1,39 @@
 use crate::{effector::Spring, id_pool::Id, types::math::*};
 
 #[derive(Clone)]
-pub enum Body {
-    // Particle {
-    Point {
-        linear: LinearState,
-    },
-    Rigid {
+pub struct Body {
+    linear: LinearState,
+    // Only for collidable
+    restitution: f64,
+    // Use option maybe
+    angular: AngularState,
+    shape: Shape,
+}
+
+impl Body {
+    pub fn new_rigid(
         linear: LinearState,
         restitution: f64,
         angular: AngularState,
         shape: Shape,
-    },
+    ) -> Self {
+        Self {
+            linear,
+            restitution,
+            angular,
+            shape,
+        }
+    }
+
+    pub fn new_particle(linear: LinearState, restitution: f64) -> Self {
+        Self {
+            linear,
+            restitution,
+            // Seems cheaty
+            angular: AngularState::new(0.0, 0.0, 0.0),
+            shape: Shape::Point,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -54,6 +76,7 @@ impl AngularState {
 
 #[derive(Clone)]
 pub enum Shape {
+    Point,
     Circle(f64),
     Rectangle(Vector<f64>),
     Polygon(Vec<Vector<f64>>),
