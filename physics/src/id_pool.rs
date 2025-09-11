@@ -4,8 +4,8 @@ pub type Id = usize;
 
 pub struct IdPool {
     next_id: Id,
-    // Use vector of booleans instead
     free_ids: HashSet<Id>,
+    max_delta: Id,
 }
 
 impl IdPool {
@@ -13,6 +13,7 @@ impl IdPool {
         Self {
             next_id: 0,
             free_ids: HashSet::new(),
+            max_delta: 0,
         }
     }
 
@@ -20,6 +21,7 @@ impl IdPool {
         if let Some(&id) = self.free_ids.iter().next() {
             self.free_ids.take(&id).unwrap()
         } else {
+            // Grow pool
             self.next_id += 1;
             self.next_id - 1
         }
@@ -32,8 +34,10 @@ impl IdPool {
             }
 
             if id == max {
+                // Shrink pool
                 self.next_id -= 1;
 
+                // Remove trailing freed ids
                 while let Some(new_max) = self.max() {
                     if !self.free_ids.contains(&new_max) {
                         break;

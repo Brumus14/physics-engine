@@ -1,7 +1,8 @@
 use std::{any::Any, collections::HashMap};
 
 use crate::{
-    body::{AngularState, LinearState},
+    body::{AngularState, Body, LinearState},
+    id_map::IdMap,
     id_pool::Id,
     types::math::*,
 };
@@ -17,11 +18,7 @@ impl<T: Effector> AsAny for T {
 }
 
 pub trait Effector: Any + AsAny + Send + Sync {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        angular_states: &mut HashMap<Id, AngularState>,
-    );
+    fn apply(&self, bodies: &mut IdMap<Body>);
 }
 
 pub struct ConstantForce {
@@ -36,13 +33,11 @@ impl ConstantForce {
 }
 
 impl Effector for ConstantForce {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        _: &mut HashMap<Id, AngularState>,
-    ) {
-        for id in self.bodies.iter() {
-            linear_states.get_mut(id).unwrap().force += self.force;
+    fn apply(&self, bodies: &mut IdMap<Body>) {
+        for id in &self.bodies {
+            if let Some(body) = bodies.get_mut(*id) {
+                body.linear.force += self.force;
+            }
         }
     }
 }
@@ -62,14 +57,11 @@ impl ConstantAcceleration {
 }
 
 impl Effector for ConstantAcceleration {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        _: &mut HashMap<Id, AngularState>,
-    ) {
-        for id in self.bodies.iter() {
-            let linear = linear_states.get_mut(id).unwrap();
-            linear.force += self.acceleration * linear.mass;
+    fn apply(&self, bodies: &mut IdMap<Body>) {
+        for id in &self.bodies {
+            if let Some(body) = bodies.get_mut(*id) {
+                body.linear.force += self.acceleration * body.linear.mass;
+            }
         }
     }
 }
@@ -89,28 +81,23 @@ impl Gravity {
 }
 
 impl Effector for Gravity {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        _: &mut HashMap<Id, AngularState>,
-    ) {
+    fn apply(&self, bodies: &mut IdMap<Body>) {
         for i in 0..self.bodies.len() {
             for j in (i + 1)..self.bodies.len() {
                 let (a_id, b_id) = (self.bodies[i], self.bodies[j]);
-                let (a, b) = (
-                    linear_states.get(&a_id).unwrap(),
-                    linear_states.get(&b_id).unwrap(),
-                );
+                let Some(a) = bodies.get(a_id) else { continue };
+                let Some(b) = bodies.get(b_id) else { continue };
 
-                let direction = b.position - a.position;
+                let direction = b.linear.position - a.linear.position;
                 // TODO: Review this
                 let distance_squared = direction.norm_squared().max(0.0001);
 
-                let force = direction.normalize() * (self.gravitational_constant * a.mass * b.mass)
+                let force = direction.normalize()
+                    * (self.gravitational_constant * a.linear.mass * b.linear.mass)
                     / distance_squared;
 
-                linear_states.get_mut(&a_id).unwrap().force += force;
-                linear_states.get_mut(&b_id).unwrap().force -= force;
+                bodies.get_mut(a_id).unwrap().linear.force += force;
+                bodies.get_mut(b_id).unwrap().linear.force -= force;
             }
         }
     }
@@ -128,14 +115,11 @@ impl ConstantTorque {
 }
 
 impl Effector for ConstantTorque {
-    fn apply(
-        &self,
-        _: &mut HashMap<Id, LinearState>,
-        angular_states: &mut HashMap<Id, AngularState>,
-    ) {
-        for id in self.bodies.iter() {
-            let angular = angular_states.get_mut(id).unwrap();
-            angular.torque += self.torque;
+    fn apply(&self, bodies: &mut IdMap<Body>) {
+        for id in &self.bodies {
+            if let Some(body) = bodies.get_mut(*id) {
+                body.angular.torque += self.torque;
+            }
         }
     }
 }
@@ -158,19 +142,23 @@ impl Spring {
 }
 
 impl Effector for Spring {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        _angular_states: &mut HashMap<Id, AngularState>,
-    ) {
-        let [a_linear, b_linear] = linear_states
-            .get_disjoint_mut([&self.bodies[0], &self.bodies[1]])
-            .map(|l| l.unwrap());
-        let length = a_linear.position.metric_distance(&b_linear.position);
+    fn apply(&self, bodies: &mut IdMap<Body>) {
+        let (a_id, b_id) = (self.bodies[0], self.bodies[1]);
+        let Some(a) = bodies.get(a_id) else {
+            return;
+        };
+
+        let Some(b) = bodies.get(b_id) else {
+            return;
+        };
+
+        let length = a.linear.position.metric_distance(&b.linear.position);
         let force = self.elasticity * (length - self.length);
-        let direction = (b_linear.position - a_linear.position).normalize();
-        a_linear.force += force * direction;
-        b_linear.force -= force * direction;
+        let direction = (b.linear.position - a.linear.position).normalize();
+
+        // Add get many mut
+        bodies.get_mut(a_id).unwrap().linear.force += force * direction;
+        bodies.get_mut(b_id).unwrap().linear.force -= force * direction;
     }
 }
 
@@ -191,15 +179,14 @@ impl Drag {
 
 // Doesn't account for area
 impl Effector for Drag {
-    fn apply(
-        &self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        _angular_states: &mut HashMap<Id, AngularState>,
-    ) {
-        for id in self.bodies.iter() {
-            let linear = linear_states.get_mut(id).unwrap();
-            linear.force +=
-                -(1.0 / 2.0) * linear.velocity.norm() * linear.velocity * self.coefficient;
+    fn apply(&self, bodies: &mut IdMap<Body>) {
+        for id in &self.bodies {
+            if let Some(body) = bodies.get_mut(*id) {
+                body.linear.force += -(1.0 / 2.0)
+                    * body.linear.velocity.norm()
+                    * body.linear.velocity
+                    * self.coefficient;
+            }
         }
     }
 }

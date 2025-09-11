@@ -11,40 +11,19 @@ pub struct DefaultCollisionPipeline {
 impl DefaultCollisionPipeline {
     pub fn new(bodies: Vec<Id>) -> Self {
         Self {
-            bodies: bodies.clone(),
-            // Clone bodies?
-            detector: DefaultCollisionDetector::new(&bodies),
+            bodies,
+            detector: DefaultCollisionDetector::new(),
             resolver: DefaultCollisionResolver::new(),
         }
     }
 }
 
 impl CollisionPipeline for DefaultCollisionPipeline {
-    fn init(
-        &mut self,
-        linear_states: &HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-        self.detector
-            .init(linear_states, restitutions, angular_states, shapes);
-        self.resolver
-            .init(linear_states, restitutions, angular_states, shapes);
-    }
+    fn init(&mut self, bodies: &mut IdMap<Body>) {}
 
-    fn handle(
-        &mut self,
-        linear_states: &mut HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-        let collisions = self
-            .detector
-            .detect(&self.bodies, linear_states, angular_states, shapes);
-        self.resolver
-            .resolve(collisions, linear_states, restitutions, shapes);
+    fn handle(&mut self, bodies: &mut IdMap<Body>) {
+        let collisions = self.detector.detect(&self.bodies, bodies);
+        self.resolver.resolve(collisions, bodies);
     }
 }
 
@@ -54,72 +33,49 @@ pub struct DefaultCollisionDetector {
 }
 
 impl DefaultCollisionDetector {
-    pub fn new(bodies: &Vec<Id>) -> Self {
+    pub fn new() -> Self {
         Self {
-            broad_phase: DefaultBroadPhase::new(bodies.clone()),
+            broad_phase: DefaultBroadPhase::new(),
             narrow_phase: DefaultNarrowPhase::new(),
         }
     }
 }
 
 impl CollisionDetection for DefaultCollisionDetector {
-    fn init(
-        &mut self,
-        linear_states: &HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-        self.broad_phase
-            .init(linear_states, restitutions, angular_states, shapes);
-        self.narrow_phase
-            .init(linear_states, restitutions, angular_states, shapes);
-    }
+    fn init(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) {}
 
-    fn detect(
-        &mut self,
-        bodies: &Vec<Id>,
-        linear_states: &HashMap<Id, LinearState>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) -> Vec<CollisionData> {
-        let body_pairs = self.broad_phase.cull(bodies, linear_states);
-        self.narrow_phase
-            .detect(bodies, body_pairs, linear_states, angular_states, shapes)
+    fn detect(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) -> Vec<CollisionData> {
+        let body_pairs = self.broad_phase.cull(managed_bodies, bodies);
+        self.narrow_phase.detect(body_pairs, bodies)
     }
 }
 
 pub struct DefaultBroadPhase {
-    bodies: Vec<Id>,
     circles: HashMap<Id, f64>,
 }
 
 impl DefaultBroadPhase {
-    pub fn new(bodies: Vec<Id>) -> Self {
+    pub fn new() -> Self {
         Self {
-            bodies,
             circles: HashMap::new(),
         }
     }
 }
 
 impl BroadPhase for DefaultBroadPhase {
-    fn init(
-        &mut self,
-        linear_states: &HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-        for body in &self.bodies {
-            if let Some(shape) = shapes.get(body) {
-                match shape {
+    fn init(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) {
+        for id in managed_bodies {
+            if let Some(body) = bodies.get(*id) {
+                match &body.shape {
+                    Shape::Point => {
+                        self.circles.insert(*id, 0.0);
+                    }
                     Shape::Circle(radius) => {
-                        self.circles.insert(*body, *radius);
+                        self.circles.insert(*id, *radius);
                     }
                     Shape::Rectangle(size) => {
                         let radius = ((size.x / 2.0).powi(2) + (size.y / 2.0).powi(2)).sqrt();
-                        self.circles.insert(*body, radius);
+                        self.circles.insert(*id, radius);
                     }
                     Shape::Polygon(points) => {
                         let mut max_radius: f64 = 0.0;
@@ -128,28 +84,26 @@ impl BroadPhase for DefaultBroadPhase {
                             max_radius = max_radius.max(point.magnitude());
                         }
 
-                        self.circles.insert(*body, max_radius);
+                        self.circles.insert(*id, max_radius);
                     }
                 }
             }
         }
     }
 
-    fn cull(&mut self, bodies: &Vec<Id>, linear_states: &HashMap<Id, LinearState>) -> Vec<[Id; 2]> {
+    fn cull(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) -> Vec<[Id; 2]> {
         let mut pairs = Vec::new();
 
-        for i in 0..bodies.len() {
-            for j in (i + 1)..bodies.len() {
-                let (a_position, b_position) = (
-                    linear_states.get(&bodies[i]).unwrap().position,
-                    linear_states.get(&bodies[j]).unwrap().position,
-                );
-                let distance = b_position.metric_distance(&a_position);
+        for i in 0..managed_bodies.len() {
+            for j in (i + 1)..managed_bodies.len() {
+                let (a_id, b_id) = (managed_bodies[i], managed_bodies[j]);
+                let Some(a) = bodies.get(a_id) else { continue };
+                let Some(b) = bodies.get(b_id) else { continue };
 
-                if distance
-                    < self.circles.get(&bodies[i]).unwrap() + self.circles.get(&bodies[j]).unwrap()
-                {
-                    pairs.push([bodies[i], bodies[j]]);
+                let distance = b.linear.position.metric_distance(&a.linear.position);
+
+                if distance < self.circles.get(&a_id).unwrap() + self.circles.get(&b_id).unwrap() {
+                    pairs.push([a_id, b_id]);
                 }
             }
         }
@@ -169,86 +123,66 @@ impl DefaultNarrowPhase {
 }
 
 impl NarrowPhase for DefaultNarrowPhase {
-    fn init(
-        &mut self,
-        linear_states: &HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-    }
+    fn init(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) {}
 
-    fn detect(
-        &mut self,
-        _bodies: &Vec<Id>,
-        body_pairs: Vec<[Id; 2]>,
-        linear_states: &HashMap<Id, LinearState>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) -> Vec<CollisionData> {
+    fn detect(&mut self, body_pairs: Vec<[Id; 2]>, bodies: &mut IdMap<Body>) -> Vec<CollisionData> {
         let mut collisions = Vec::new();
 
         for pair in body_pairs {
-            let (a_linear, b_linear) = (
-                linear_states.get(&pair[0]).unwrap(),
-                linear_states.get(&pair[1]).unwrap(),
-            );
-            let (a_angular, b_angular) = (
-                angular_states.get(&pair[0]).unwrap(),
-                angular_states.get(&pair[1]).unwrap(),
-            );
-            let (a_shape, b_shape) = (shapes.get(&pair[0]).unwrap(), shapes.get(&pair[1]).unwrap());
+            let (a_id, b_id) = (pair[0], pair[1]);
+            let Some(a) = bodies.get(a_id) else { continue };
+            let Some(b) = bodies.get(b_id) else { continue };
 
-            if let Some(collision) = match a_shape {
-                Shape::Circle(a_radius) => match b_shape {
+            if let Some(collision) = match a.shape {
+                Shape::Circle(a_radius) => match b.shape {
                     Shape::Circle(b_radius) => DefaultNarrowPhase::detect_circle_circle(
                         pair[0],
                         pair[1],
-                        *a_radius,
-                        *b_radius,
-                        &a_linear.position,
-                        &b_linear.position,
+                        a_radius,
+                        b_radius,
+                        &a.linear.position,
+                        &b.linear.position,
                     ),
                     _ => None,
                 },
-                Shape::Rectangle(a_size) => match b_shape {
+                Shape::Rectangle(a_size) => match b.shape {
                     Shape::Rectangle(b_size) => DefaultNarrowPhase::detect_sat(
                         pair[0],
                         pair[1],
                         vec![
-                            a_linear.position
-                                + Rotation::new(-a_angular.rotation)
+                            a.linear.position
+                                + Rotation::new(-a.angular.rotation)
                                     * Vector::new(-a_size.x / 2.0, a_size.y / 2.0),
-                            a_linear.position
-                                + Rotation::new(-a_angular.rotation)
+                            a.linear.position
+                                + Rotation::new(-a.angular.rotation)
                                     * Vector::new(a_size.x / 2.0, a_size.y / 2.0),
-                            a_linear.position
-                                + Rotation::new(-a_angular.rotation)
+                            a.linear.position
+                                + Rotation::new(-a.angular.rotation)
                                     * Vector::new(a_size.x / 2.0, -a_size.y / 2.0),
-                            a_linear.position
-                                + Rotation::new(-a_angular.rotation)
+                            a.linear.position
+                                + Rotation::new(-a.angular.rotation)
                                     * Vector::new(-a_size.x / 2.0, -a_size.y / 2.0),
                         ],
                         vec![
-                            b_linear.position
-                                + Rotation::new(-b_angular.rotation)
+                            b.linear.position
+                                + Rotation::new(-b.angular.rotation)
                                     * Vector::new(-b_size.x / 2.0, b_size.y / 2.0),
-                            b_linear.position
-                                + Rotation::new(-b_angular.rotation)
+                            b.linear.position
+                                + Rotation::new(-b.angular.rotation)
                                     * Vector::new(b_size.x / 2.0, b_size.y / 2.0),
-                            b_linear.position
-                                + Rotation::new(-b_angular.rotation)
+                            b.linear.position
+                                + Rotation::new(-b.angular.rotation)
                                     * Vector::new(b_size.x / 2.0, -b_size.y / 2.0),
-                            b_linear.position
-                                + Rotation::new(-b_angular.rotation)
+                            b.linear.position
+                                + Rotation::new(-b.angular.rotation)
                                     * Vector::new(-b_size.x / 2.0, -b_size.y / 2.0),
                         ],
-                        &a_linear.position,
-                        &b_linear.position,
+                        &a.linear.position,
+                        &b.linear.position,
                         vec![Vector::new(0.0, 1.0), Vector::new(1.0, 0.0)],
                         vec![Vector::new(0.0, 1.0), Vector::new(1.0, 0.0)],
-                        a_angular.rotation,
-                        b_angular.rotation,
+                        a.angular.rotation,
+                        b.angular.rotation,
                     ),
                     _ => None,
                 },
@@ -258,12 +192,12 @@ impl NarrowPhase for DefaultNarrowPhase {
                 //         pair[1],
                 //         a_points,
                 //         b_points,
-                //         a_linear.position,
-                //         b_linear.position,
+                //         a.linear.position,
+                //         b.linear.position,
                 //         a_normals,
                 //         b_normals,
-                //         a_angular.rotation,
-                //         b_angular.rotation,
+                //         a.angular.rotation,
+                //         b.angular.rotation,
                 //     ),
                 //     _ => None,
                 // },
@@ -411,46 +345,43 @@ impl DefaultCollisionResolver {
 }
 
 impl CollisionResolution for DefaultCollisionResolver {
-    fn init(
-        &mut self,
-        linear_states: &HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        angular_states: &HashMap<Id, AngularState>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
-    }
+    fn init(&mut self, bodies: &mut IdMap<Body>) {}
 
-    fn resolve(
-        &mut self,
-        collisions: Vec<CollisionData>,
-        linear_states: &mut HashMap<Id, LinearState>,
-        restitutions: &HashMap<Id, f64>,
-        shapes: &HashMap<Id, Shape>,
-    ) {
+    fn resolve(&mut self, collisions: Vec<CollisionData>, bodies: &mut IdMap<Body>) {
         for collision in collisions {
-            let a_id = collision.bodies[0];
-            let b_id = collision.bodies[1];
-            let [a_linear, b_linear] = linear_states.get_disjoint_mut([&a_id, &b_id]);
-            let a_linear = a_linear.unwrap();
-            let b_linear = b_linear.unwrap();
-            let [a_restitution, b_restitution] = [
-                restitutions.get(&a_id).unwrap(),
-                restitutions.get(&b_id).unwrap(),
-            ];
+            // MAKE A GET DISJOINT MUT FOR BODIES
+            let (a_id, b_id) = (collision.bodies[0], collision.bodies[1]);
+            let Some(a) = bodies.get(a_id) else { continue };
+            let Some(b) = bodies.get(b_id) else { continue };
 
-            let impulse = -(1.0 + *a_restitution * *b_restitution)
-                * (b_linear.velocity - a_linear.velocity).dot(&collision.normal)
-                / (1.0 / a_linear.mass + 1.0 / b_linear.mass);
+            let impulse = -(1.0 + a.restitution * b.restitution)
+                * (b.linear.velocity - a.linear.velocity).dot(&collision.normal)
+                / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
 
-            a_linear.velocity -= impulse / a_linear.mass * collision.normal;
-            b_linear.velocity += impulse / b_linear.mass * collision.normal;
+            let Some(a) = bodies.get_mut(a_id) else {
+                continue;
+            };
+            a.linear.velocity -= impulse / a.linear.mass * collision.normal;
+            let Some(b) = bodies.get_mut(b_id) else {
+                continue;
+            };
+            b.linear.velocity += impulse / b.linear.mass * collision.normal;
 
             // Positional correction
             if collision.depth > self.correction_tolerance {
+                let Some(a) = bodies.get(a_id) else { continue };
+                let Some(b) = bodies.get(b_id) else { continue };
                 let correction = (collision.depth * self.correction_level * collision.normal)
-                    / (1.0 / a_linear.mass + 1.0 / b_linear.mass);
-                a_linear.position -= correction / a_linear.mass;
-                b_linear.position += correction / b_linear.mass;
+                    / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
+
+                let Some(a) = bodies.get_mut(a_id) else {
+                    continue;
+                };
+                a.linear.position -= correction / a.linear.mass;
+                let Some(b) = bodies.get_mut(b_id) else {
+                    continue;
+                };
+                b.linear.position += correction / b.linear.mass;
             }
         }
     }

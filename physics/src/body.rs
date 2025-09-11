@@ -2,12 +2,12 @@ use crate::{effector::Spring, id_pool::Id, types::math::*};
 
 #[derive(Clone)]
 pub struct Body {
-    linear: LinearState,
+    pub linear: LinearState,
     // Only for collidable
-    restitution: f64,
+    pub restitution: f64,
     // Use option maybe
-    angular: AngularState,
-    shape: Shape,
+    pub angular: AngularState,
+    pub shape: Shape,
 }
 
 impl Body {
