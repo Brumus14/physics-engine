@@ -1,16 +1,16 @@
-use std::{any::Any, collections::HashMap};
-
 use crate::{
     body::{AngularState, Body, LinearState, Shape},
     collision::CollisionPipeline,
     effector::Effector,
     id_map::{Id, IdMap},
+    integrator::{self, Integrator},
     types::math::Vector,
 };
 
 pub struct World {
     bodies: IdMap<Body>,
     // body_groups: HashMap<Id, Vec<Id>>,
+    integrators: IdMap<Box<dyn Integrator + Send + Sync>>,
     effectors: IdMap<Box<dyn Effector + Send + Sync>>,
     collision_pipelines: IdMap<Box<dyn CollisionPipeline + Send + Sync>>,
 }
@@ -20,6 +20,7 @@ impl World {
         Self {
             bodies: IdMap::new(),
             // body_groups: HashMap::new(),
+            integrators: IdMap::new(),
             effectors: IdMap::new(),
             collision_pipelines: IdMap::new(),
         }
@@ -62,9 +63,9 @@ impl World {
 
     pub fn add_collision_pipeline(
         &mut self,
-        collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
+        mut collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
     ) -> Id {
-        // Init?
+        collision_pipeline.init(&mut self.bodies);
         self.collision_pipelines.add(collision_pipeline)
     }
 
@@ -78,36 +79,30 @@ impl World {
         }
     }
 
+    // Is there a way to not keep doing + Send + Sync
+    pub fn add_integrator(&mut self, integrator: Box<dyn Integrator + Send + Sync>) -> Id {
+        self.integrators.add(integrator)
+    }
+
+    pub fn remove_integrator(&mut self, id: Id) {
+        self.integrators.remove(id);
+    }
+
     pub fn step(&mut self, delta_time: f64) {
-        // Add integrators
+        for integrator in self.integrators.values_mut() {
+            integrator.step(delta_time, &mut self.bodies);
+        }
+
+        // Reset force and torque
         for body in self.bodies.values_mut() {
-            let linear = &mut body.linear;
-
-            linear.velocity += (linear.force / linear.mass) * delta_time;
-            linear.position += linear.velocity * delta_time;
-            linear.force = Vector::zeros();
-
-            let angular = &mut body.angular;
-
-            // Is this dodgy
-            if angular.inertia == 0.0 {
-                continue;
-            };
-
-            angular.velocity += (angular.torque / angular.inertia) * delta_time;
-            angular.rotation += angular.velocity * delta_time;
-            angular.torque = 0.0;
+            body.linear.force = Vector::zeros();
+            body.angular.torque = 0.0;
         }
     }
 
     pub fn handle_collisions(&mut self) {
         for pipeline in self.collision_pipelines.values_mut() {
-            // pipeline.handle(
-            //     &mut self.linear_states,
-            //     &self.restitutions,
-            //     &mut self.angular_states,
-            //     &self.shapes,
-            // );
+            pipeline.handle(&mut self.bodies);
         }
     }
 

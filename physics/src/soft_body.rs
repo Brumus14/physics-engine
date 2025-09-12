@@ -1,7 +1,7 @@
 use crate::{
     body::{Body, LinearState},
     effector::Spring,
-    id_pool::Id,
+    id_map::Id,
     world::World,
 };
 

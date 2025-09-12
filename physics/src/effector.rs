@@ -2,8 +2,7 @@ use std::{any::Any, collections::HashMap};
 
 use crate::{
     body::{AngularState, Body, LinearState},
-    id_map::IdMap,
-    id_pool::Id,
+    id_map::{Id, IdMap},
     types::math::*,
 };
 
@@ -17,6 +16,7 @@ impl<T: Effector> AsAny for T {
     }
 }
 
+// Maybe add init
 pub trait Effector: Any + AsAny + Send + Sync {
     fn apply(&self, bodies: &mut IdMap<Body>);
 }

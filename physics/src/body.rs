@@ -1,7 +1,8 @@
-use crate::{effector::Spring, id_pool::Id, types::math::*};
+use crate::{effector::Spring, types::math::*};
 
 #[derive(Clone)]
 pub struct Body {
+    // Not pub? add getters?
     pub linear: LinearState,
     // Only for collidable
     pub restitution: f64,
@@ -11,6 +12,7 @@ pub struct Body {
 }
 
 impl Body {
+    // Rename to just new?
     pub fn new_rigid(
         linear: LinearState,
         restitution: f64,

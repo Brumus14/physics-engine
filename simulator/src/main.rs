@@ -12,8 +12,8 @@ use physics::{
     body::{AngularState, Body, LinearState, Shape},
     collision::default::{DefaultCollisionPipeline, DefaultNarrowPhase},
     effector::{ConstantAcceleration, Drag, Spring},
-    id_map::IdMap,
-    id_pool::{Id, IdPool},
+    id_map::{Id, IdMap},
+    integrator::SemiImplicitEuler,
     soft_body::{self, SoftBodySpring},
     types::math::*,
     world::World,
@@ -30,10 +30,7 @@ struct PhysicsWorld {
 
 // Make enum?
 #[derive(Component)]
-struct ParticleBodyId(Id);
-
-#[derive(Component)]
-struct RigidBodyId(Id);
+struct BodyId(Id);
 
 #[derive(Component)]
 struct SpringId(Id);
@@ -76,30 +73,17 @@ fn spawn_physics_body(
 ) -> Id {
     let id = physics_world.world.add_body(body.clone());
 
-    // match &body {
-    //     Body::Point { linear } => {
-    //         commands.spawn((
-    //             Mesh2d(meshes.add(Circle::new(POINT_SIZE))),
-    //             MeshMaterial2d(materials.add(colour)),
-    //             Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0),
-    //             ParticleBodyId(id),
-    //         ));
-    //     }
-    //     Body::Rigid {
-    //         linear,
-    //         restitution,
-    //         angular,
-    //         shape,
-    //     } => {
-    //         commands.spawn((
-    //             Mesh2d(meshes.add(shape_to_mesh(shape))),
-    //             MeshMaterial2d(materials.add(colour)),
-    //             Transform::from_xyz(linear.position.x as f32, linear.position.y as f32, 0.0)
-    //                 .with_rotation(Quat::from_rotation_z(-angular.rotation as f32)),
-    //             RigidBodyId(id),
-    //         ));
-    //     }
-    // }
+    commands.spawn((
+        Mesh2d(meshes.add(shape_to_mesh(&body.shape))),
+        MeshMaterial2d(materials.add(colour)),
+        Transform::from_xyz(
+            body.linear.position.x as f32,
+            body.linear.position.y as f32,
+            0.0,
+        )
+        .with_rotation(Quat::from_rotation_z(-body.angular.rotation as f32)),
+        BodyId(id),
+    ));
 
     id
 }
@@ -190,72 +174,66 @@ fn startup(
 
     let mut bodies: Vec<Id> = Vec::new();
 
-    // for i in 0..1000 {
-    //     bodies.push(spawn_physics_body(
-    //         &mut commands,
-    //         &mut meshes,
-    //         &mut materials,
-    //         &mut physics_world,
-    //         Body::Rigid {
-    //             linear: LinearState::new(
-    //                 Vector::new(
-    //                     rng.random_range(-800.0..800.0),
-    //                     rng.random_range(-500.0..500.0),
-    //                 ),
-    //                 Vector::zeros(),
-    //                 1.0,
-    //             ),
-    //             restitution: 1.0,
-    //             angular: AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1.0),
-    //             shape: Shape::Rectangle(Vector::new(100.0, 50.0)),
-    //         },
-    //         Color::WHITE,
-    //     ));
-    // }
-    //
-    // let ground = spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::Rigid {
-    //         linear: LinearState::new(Vector::new(0.0, -500.0), Vector::zeros(), f64::INFINITY),
-    //         restitution: 0.0,
-    //         angular: AngularState::new(0.0, 0.0, 1.0),
-    //         shape: Shape::Rectangle(Vector::new(1600.0, 50.0)),
-    //     },
-    //     Color::WHITE,
-    // );
-    //
-    // physics_world
-    //     .world
-    //     .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(
-    //         vec![bodies.as_slice(), &[ground]].concat(),
-    //     )));
-    //
-    // physics_world
-    //     .world
-    //     .add_effector(Box::new(ConstantAcceleration::new(
-    //         bodies,
-    //         Vector::new(0.0, -200.0),
-    //     )));
+    for i in 0..100 {
+        bodies.push(spawn_physics_body(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut physics_world,
+            Body::new_rigid(
+                LinearState::new(
+                    Vector::new(
+                        rng.random_range(-800.0..800.0),
+                        rng.random_range(-500.0..500.0),
+                    ),
+                    Vector::zeros(),
+                    1.0,
+                ),
+                1.0,
+                AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1.0),
+                Shape::Rectangle(Vector::new(100.0, 50.0)),
+            ),
+            Color::WHITE,
+        ));
+    }
+
+    let ground = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::new_rigid(
+            LinearState::new(Vector::new(0.0, -500.0), Vector::zeros(), f64::INFINITY),
+            0.8,
+            AngularState::new(0.0, 0.0, 1.0),
+            Shape::Rectangle(Vector::new(1600.0, 50.0)),
+        ),
+        Color::WHITE,
+    );
+
+    physics_world
+        .world
+        .add_integrator(Box::new(SemiImplicitEuler::new(bodies.clone())));
+
+    physics_world
+        .world
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(
+            vec![bodies.as_slice(), &[ground]].concat(),
+        )));
+
+    physics_world
+        .world
+        .add_effector(Box::new(ConstantAcceleration::new(
+            bodies.clone(),
+            Vector::new(0.0, -200.0),
+        )));
 }
 
 fn update_physics(
     mut physics_world: ResMut<PhysicsWorld>,
     time: Res<Time>,
-    mut particle_query: Query<
-        (&ParticleBodyId, &mut Transform),
-        (Without<RigidBodyId>, Without<SpringId>),
-    >,
-    mut rigid_body_query: Query<
-        (&RigidBodyId, &mut Transform),
-        (Without<ParticleBodyId>, Without<SpringId>),
-    >,
-    mut spring_query: Query<
-        (&SpringId, &mut Transform),
-        (Without<ParticleBodyId>, Without<RigidBodyId>),
-    >,
+    mut body_query: Query<(&BodyId, &mut Transform), Without<SpringId>>,
+    mut spring_query: Query<(&SpringId, &mut Transform), Without<BodyId>>,
 ) {
     let physics_world = &mut physics_world.world;
 
@@ -263,16 +241,8 @@ fn update_physics(
     physics_world.step(time.delta_secs_f64());
     physics_world.handle_collisions();
 
-    for (body, mut transform) in particle_query.iter_mut() {
-        let ParticleBodyId(id) = body;
-
-        let position = physics_world.get_body(*id).unwrap().linear.position;
-        transform.translation.x = position.x as f32;
-        transform.translation.y = position.y as f32;
-    }
-
-    for (body, mut transform) in rigid_body_query.iter_mut() {
-        let RigidBodyId(id) = body;
+    for (body, mut transform) in body_query.iter_mut() {
+        let BodyId(id) = body;
 
         let position = physics_world.get_body(*id).unwrap().linear.position;
         transform.translation.x = position.x as f32;

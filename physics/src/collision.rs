@@ -1,8 +1,7 @@
 pub mod default;
 
 use crate::body::{AngularState, Body, LinearState, Shape};
-use crate::id_map::IdMap;
-use crate::id_pool::Id;
+use crate::id_map::{Id, IdMap};
 use crate::types::math::*;
 use std::collections::HashMap;
 
@@ -19,7 +18,7 @@ pub trait CollisionDetection {
 }
 
 pub trait BroadPhase {
-    // Remove into another trait
+    // Remove init into another trait
     fn init(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>);
 
     // Better name
@@ -43,6 +42,7 @@ pub struct CollisionData {
     pub bodies: [Id; 2],
     // Maybe use Point instead
     pub point: Vector<f64>,
+    // From b to a
     pub normal: Vector<f64>,
     pub depth: f64,
 }
