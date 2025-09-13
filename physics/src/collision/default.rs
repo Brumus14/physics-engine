@@ -77,11 +77,7 @@ impl BroadPhase for DefaultBroadPhase {
                     Shape::Circle(radius) => {
                         self.circles.insert(*id, *radius);
                     }
-                    Shape::Rectangle(size) => {
-                        let radius = ((size.x / 2.0).powi(2) + (size.y / 2.0).powi(2)).sqrt();
-                        self.circles.insert(*id, radius);
-                    }
-                    Shape::Polygon(points) => {
+                    Shape::Polygon { points, axes: _ } => {
                         let mut max_radius: f64 = 0.0;
 
                         for point in points {
@@ -129,6 +125,7 @@ impl DefaultNarrowPhase {
 impl NarrowPhase for DefaultNarrowPhase {
     fn init(&mut self, managed_bodies: &Vec<Id>, bodies: &mut IdMap<Body>) {}
 
+    // Doesnt work for points
     fn detect(&mut self, body_pairs: Vec<[Id; 2]>, bodies: &mut IdMap<Body>) -> Vec<CollisionData> {
         let mut collisions = Vec::new();
 
@@ -137,78 +134,78 @@ impl NarrowPhase for DefaultNarrowPhase {
             let Some(a) = bodies.get(a_id) else { continue };
             let Some(b) = bodies.get(b_id) else { continue };
 
-            if let Some(collision) = match a.shape {
-                Shape::Circle(a_radius) => match b.shape {
-                    Shape::Circle(b_radius) => DefaultNarrowPhase::detect_circle_circle(
-                        pair[0],
-                        &a.linear.position,
-                        a_radius,
-                        pair[1],
-                        &b.linear.position,
-                        b_radius,
-                    ),
-                    _ => None,
-                },
-                Shape::Rectangle(a_size) => match b.shape {
-                    Shape::Rectangle(b_size) => DefaultNarrowPhase::detect_sat(
-                        pair[0],
-                        &a.linear.position,
-                        vec![
-                            b.linear.position
-                                + Rotation::new(-b.angular.rotation)
-                                    * Vector::new(-b_size.x / 2.0, b_size.y / 2.0),
-                            b.linear.position
-                                + Rotation::new(-b.angular.rotation)
-                                    * Vector::new(b_size.x / 2.0, b_size.y / 2.0),
-                            b.linear.position
-                                + Rotation::new(-b.angular.rotation)
-                                    * Vector::new(b_size.x / 2.0, -b_size.y / 2.0),
-                            b.linear.position
-                                + Rotation::new(-b.angular.rotation)
-                                    * Vector::new(-b_size.x / 2.0, -b_size.y / 2.0),
-                        ],
-                        vec![Vector::new(0.0, 1.0), Vector::new(1.0, 0.0)],
-                        a.angular.rotation,
-                        pair[1],
-                        &b.linear.position,
-                        vec![
-                            a.linear.position
-                                + Rotation::new(-a.angular.rotation)
-                                    * Vector::new(-a_size.x / 2.0, a_size.y / 2.0),
-                            a.linear.position
-                                + Rotation::new(-a.angular.rotation)
-                                    * Vector::new(a_size.x / 2.0, a_size.y / 2.0),
-                            a.linear.position
-                                + Rotation::new(-a.angular.rotation)
-                                    * Vector::new(a_size.x / 2.0, -a_size.y / 2.0),
-                            a.linear.position
-                                + Rotation::new(-a.angular.rotation)
-                                    * Vector::new(-a_size.x / 2.0, -a_size.y / 2.0),
-                        ],
-                        vec![Vector::new(0.0, 1.0), Vector::new(1.0, 0.0)],
-                        b.angular.rotation,
-                    ),
-                    _ => None,
-                },
-                // Shape::Polygon(a_points) => match b_shape {
-                //     Shape::Polygon(b_points) => DefaultNarrowPhase::detect_sat(
-                //         pair[0],
-                //         pair[1],
-                //         a_points,
-                //         b_points,
-                //         a.linear.position,
-                //         b.linear.position,
-                //         a_normals,
-                //         b_normals,
-                //         a.angular.rotation,
-                //         b.angular.rotation,
-                //     ),
-                //     _ => None,
-                // },
-                _ => None,
-            } {
+            let collision: Option<CollisionData> = if let Shape::Circle(a_radius) = &a.shape
+                && let Shape::Circle(b_radius) = &b.shape
+            {
+                DefaultNarrowPhase::detect_circle_circle(
+                    pair[0],
+                    &a.linear.position,
+                    *a_radius,
+                    pair[1],
+                    &b.linear.position,
+                    *b_radius,
+                )
+            } else {
+                DefaultNarrowPhase::detect_sat(
+                    pair[0],
+                    &a.linear.position,
+                    a.angular.orientation,
+                    &a.shape,
+                    pair[1],
+                    &b.linear.position,
+                    b.angular.orientation,
+                    &b.shape,
+                )
+            };
+
+            // match &a.shape {
+            //     Shape::Circle(a_radius) => match &b.shape {
+            //         Shape::Circle(b_radius) => DefaultNarrowPhase::detect_circle_circle(
+            //             pair[0],
+            //             &a.linear.position,
+            //             *a_radius,
+            //             pair[1],
+            //             &b.linear.position,
+            //             *b_radius,
+            //         ),
+            //         // Dont actually need to match shapes?
+            //         Shape::Polygon { points, axes } => DefaultNarrowPhase::detect_sat(
+            //             pair[0],
+            //             &a.linear.position,
+            //             a.angular.orientation,
+            //             &a.shape,
+            //             pair[1],
+            //             &b.linear.position,
+            //             b.angular.orientation,
+            //             &b.shape,
+            //         ),
+            //         _ => None,
+            //     },
+            //     Shape::Polygon {
+            //         points: a_points,
+            //         axes: _,
+            //     } => match &b.shape {
+            //         Shape::Polygon {
+            //             points: b_points,
+            //             axes: _,
+            //         } => DefaultNarrowPhase::detect_sat(
+            //             pair[0],
+            //             &a.linear.position,
+            //             a.angular.orientation,
+            //             &a.shape,
+            //             pair[1],
+            //             &b.linear.position,
+            //             b.angular.orientation,
+            //             &b.shape,
+            //         ),
+            //         _ => None,
+            //     },
+            //     _ => None,
+            // };
+
+            if let Some(collision) = collision {
                 self.collisions += 1;
-                // println!("{:?}", collision);
+                println!("{:?}", collision);
                 collisions.push(collision);
             }
         }
@@ -246,27 +243,32 @@ impl DefaultNarrowPhase {
     // Separating Axis Theorem (SAT)
     // Take in normals?
     // Optimise
+    // Just pass in shape, add shape.project
+    // Does / should this be collision when touching?
     pub fn detect_sat(
         a_id: Id,
         a_position: &Vector<f64>,
-        a_points: Vec<Vector<f64>>,
-        a_normals: Vec<Vector<f64>>,
-        a_rotation: f64,
+        a_orientation: f64,
+        a_shape: &Shape,
         b_id: Id,
         b_position: &Vector<f64>,
-        b_points: Vec<Vector<f64>>,
-        b_normals: Vec<Vector<f64>>,
-        b_rotation: f64,
+        b_orientation: f64,
+        b_shape: &Shape,
     ) -> Option<CollisionData> {
         // Pass in axes maybe
         let mut axes: Vec<Vector<f64>> = Vec::new();
 
-        for normal in a_normals {
-            axes.push(Rotation::new(-a_rotation) * normal);
+        // Dont add duplicate axes
+        if let Shape::Polygon { points: _, axes: a } = a_shape {
+            for axis in a {
+                axes.push(*axis);
+            }
         }
 
-        for normal in b_normals {
-            axes.push(Rotation::new(-b_rotation) * -normal);
+        if let Shape::Polygon { points: _, axes: a } = b_shape {
+            for axis in a {
+                axes.push(-*axis);
+            }
         }
 
         let mut min_penetration = f64::INFINITY;
@@ -275,24 +277,8 @@ impl DefaultNarrowPhase {
         let mut b_closest_point_index: usize;
 
         for axis in &axes {
-            let mut a_min = f64::INFINITY;
-            let mut a_max = f64::NEG_INFINITY;
-            let mut b_min = f64::INFINITY;
-            let mut b_max = f64::NEG_INFINITY;
-
-            // Project a points
-            for point in &a_points {
-                let projection = point.dot(axis);
-                a_min = a_min.min(projection);
-                a_max = a_max.max(projection);
-            }
-
-            // Project b points
-            for point in &b_points {
-                let projection = point.dot(axis);
-                b_min = b_min.min(projection);
-                b_max = b_max.max(projection);
-            }
+            let (a_min, a_max) = Shape::project(a_shape, axis, a_position, a_orientation);
+            let (b_min, b_max) = Shape::project(b_shape, axis, b_position, b_orientation);
 
             // Calculate penetration depth
             let penetration = a_max.min(b_max) - a_min.max(b_min);
@@ -321,76 +307,7 @@ impl DefaultNarrowPhase {
         Some(CollisionData {
             bodies: [a_id, b_id],
             // Set point
-            point: Vector::zeros(),
-            normal: collision_normal,
-            depth: min_penetration,
-        })
-    }
-
-    pub fn detect_sat_circle(
-        a_id: Id,
-        a_points: Vec<Vector<f64>>,
-        a_position: &Vector<f64>,
-        a_normals: Vec<Vector<f64>>,
-        a_rotation: f64,
-        b_id: Id,
-        b_position: &Vector<f64>,
-        b_radius: f64,
-    ) -> Option<CollisionData> {
-        // Pass in axes maybe
-        let mut axes: Vec<Vector<f64>> = Vec::new();
-
-        for normal in a_normals {
-            axes.push(Rotation::new(-a_rotation) * normal);
-        }
-
-        let mut min_penetration = f64::INFINITY;
-        let mut min_axis: Option<&Vector<f64>> = None;
-
-        for axis in &axes {
-            let mut a_min = f64::INFINITY;
-            let mut a_max = f64::NEG_INFINITY;
-
-            // Project a points
-            for point in &a_points {
-                let projection = point.dot(axis);
-                a_min = a_min.min(projection);
-                a_max = a_max.max(projection);
-            }
-
-            // Project b points
-            let b_min = b_position.dot(axis) - b_radius;
-            let b_max = b_position.dot(axis) + b_radius;
-
-            // Calculate penetration depth
-            let penetration = a_max.min(b_max) - a_min.max(b_min);
-
-            if b_min >= a_max || a_min >= b_max {
-                // Axis has no intersection so no collision
-                return None;
-            } else {
-                if penetration < min_penetration {
-                    min_penetration = penetration;
-                    min_axis = Some(axis);
-                }
-            }
-        }
-
-        let min_axis = min_axis.unwrap().clone();
-        let a_projection = a_position.dot(&min_axis);
-        let b_projection = b_position.dot(&min_axis);
-
-        let mut collision_normal = min_axis;
-
-        if b_projection - a_projection < 0.0 {
-            collision_normal *= -1.0;
-        }
-
-        let collision_point = b_position + collision_normal * min_penetration;
-
-        Some(CollisionData {
-            bodies: [a_id, b_id],
-            point: collision_point,
+            point: b_position + Vector::new(-40.0, -25.0),
             normal: collision_normal,
             depth: min_penetration,
         })
@@ -416,23 +333,40 @@ impl CollisionResolution for DefaultCollisionResolver {
 
     fn resolve(&mut self, collisions: Vec<CollisionData>, bodies: &mut IdMap<Body>) {
         for collision in collisions {
-            // MAKE A GET DISJOINT MUT FOR BODIES
+            // Make a get disjoint mut for bodies
             let (a_id, b_id) = (collision.bodies[0], collision.bodies[1]);
             let Some(a) = bodies.get(a_id) else { continue };
             let Some(b) = bodies.get(b_id) else { continue };
 
-            let impulse = -(1.0 + a.restitution * b.restitution)
-                * (b.linear.velocity - a.linear.velocity).dot(&collision.normal)
-                / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
+            let restitution = a.restitution * b.restitution;
+            let relative_velocity = b.linear.velocity - a.linear.velocity;
+
+            let a_to_point = collision.point - a.linear.position;
+            let a_to_point_perp = Vector::new(-a_to_point.y, a_to_point.x);
+            let b_to_point = collision.point - b.linear.position;
+            let b_to_point_perp = Vector::new(-b_to_point.y, b_to_point.x);
+
+            // Separate calculation for none angular bodies
+            // What happens if one can rotate but other cant?
+            let impulse_magnitude = -(1.0 + restitution) * relative_velocity.dot(&collision.normal)
+                / (1.0 / a.linear.mass
+                    + 1.0 / b.linear.mass
+                    + a_to_point_perp.dot(&collision.normal).powi(2) / a.angular.inertia
+                    + b_to_point_perp.dot(&collision.normal).powi(2) / b.angular.inertia);
 
             let Some(a) = bodies.get_mut(a_id) else {
                 continue;
             };
-            a.linear.velocity -= impulse / a.linear.mass * collision.normal;
+            a.linear.velocity -= impulse_magnitude / a.linear.mass * collision.normal;
+            a.angular.velocity -=
+                a_to_point_perp.dot(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
+
             let Some(b) = bodies.get_mut(b_id) else {
                 continue;
             };
-            b.linear.velocity += impulse / b.linear.mass * collision.normal;
+            b.linear.velocity += impulse_magnitude / b.linear.mass * collision.normal;
+            b.angular.velocity -=
+                b_to_point_perp.dot(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
 
             // Positional correction
             if collision.depth > self.correction_tolerance {

@@ -37,7 +37,7 @@ impl Integrator for ExplicitEuler {
                     continue;
                 };
 
-                angular.rotation += angular.velocity * delta_time;
+                angular.orientation += angular.velocity * delta_time;
                 angular.velocity += (angular.torque / angular.inertia) * delta_time;
                 angular.torque = 0.0;
             }
@@ -71,7 +71,7 @@ impl Integrator for SemiImplicitEuler {
                 };
 
                 angular.velocity += (angular.torque / angular.inertia) * delta_time;
-                angular.rotation += angular.velocity * delta_time;
+                angular.orientation += angular.velocity * delta_time;
             }
         }
     }

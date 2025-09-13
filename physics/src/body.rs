@@ -1,3 +1,5 @@
+use std::f64;
+
 use crate::{effector::Spring, types::math::*};
 
 #[derive(Clone)]
@@ -6,11 +8,12 @@ pub struct Body {
     pub linear: LinearState,
     // Only for collidable
     pub restitution: f64,
-    // Use option maybe
+    // Both optional then remove point shape?
     pub angular: AngularState,
     pub shape: Shape,
 }
 
+// Maybe add function to apply force at a point
 impl Body {
     // Rename to just new?
     pub fn new_rigid(
@@ -59,16 +62,16 @@ impl LinearState {
 
 #[derive(Clone)]
 pub struct AngularState {
-    pub rotation: f64,
+    pub orientation: f64,
     pub velocity: f64,
     pub torque: f64,
     pub inertia: f64,
 }
 
 impl AngularState {
-    pub fn new(rotation: f64, velocity: f64, inertia: f64) -> Self {
+    pub fn new(orientation: f64, velocity: f64, inertia: f64) -> Self {
         Self {
-            rotation,
+            orientation,
             velocity,
             torque: 0.0,
             inertia,
@@ -80,28 +83,79 @@ impl AngularState {
 pub enum Shape {
     Point,
     Circle(f64),
-    Rectangle(Vector<f64>),
-    Polygon(Vec<Vector<f64>>),
+    Polygon {
+        points: Vec<Vector<f64>>,
+        axes: Vec<Vector<f64>>,
+    },
 }
 
-// #[derive(Clone)]
-// pub enum Shape {
-//     Circle(f64),
-//     Polygon {
-//         points: Vec<Vector<f64>>,
-//         normals: Vec<Vector<f64>>,
-//     },
-// }
-//
-// impl Shape {
-//     pub fn new_circle(radius: f64) -> Self {
-//         Shape::Circle(radius)
-//     }
-//
-//     // pub fn new_rectangle(size: Vector<f64>) -> Self {
-//     //     Shape::Polygon {
-//     //         points: vec![],
-//     //         normals: (),
-//     //     }
-//     // }
-// }
+impl Shape {
+    pub fn new_circle(radius: f64) -> Self {
+        Shape::Circle(radius)
+    }
+
+    pub fn new_rectangle(size: Vector<f64>) -> Self {
+        let half_size = size / 2.0;
+        Shape::Polygon {
+            points: vec![
+                Vector::new(half_size.x, half_size.y),
+                Vector::new(-half_size.x, half_size.y),
+                Vector::new(-half_size.x, -half_size.y),
+                Vector::new(half_size.x, -half_size.y),
+            ],
+            axes: vec![Vector::new(1.0, 0.0), Vector::new(0.0, 1.0)],
+        }
+    }
+
+    // Counter clockwise points
+    pub fn new_polygon(points: Vec<Vector<f64>>) -> Self {
+        let mut axes: Vec<Vector<f64>> = Vec::new();
+
+        for i in 0..points.len() {
+            let line = (points[(i + 1) % points.len()] - points[i]).normalize();
+            let normal = Vector::new(line.y, -line.x);
+
+            // let duplicate_axis = axes.iter().any(|a| {
+            //     // Move to const
+            //     normal.dot(a).abs() > 0.999
+            // });
+            //
+            // if !duplicate_axis {
+            axes.push(normal);
+            // }
+        }
+
+        Shape::Polygon { points, axes }
+    }
+
+    pub fn project(
+        shape: &Shape,
+        axis: &Vector<f64>,
+        position: &Vector<f64>,
+        orientation: f64,
+    ) -> (f64, f64) {
+        // Account for axis rotation
+        match shape {
+            Shape::Point => {
+                let projection = position.dot(axis);
+                (projection, projection)
+            }
+            Shape::Circle(radius) => {
+                let projection = position.dot(axis);
+                (projection - radius, projection + radius)
+            }
+            Shape::Polygon { points, axes: _ } => {
+                let mut min = f64::INFINITY;
+                let mut max = f64::NEG_INFINITY;
+
+                for point in points {
+                    let projection = (position + Rotation::new(orientation) * point).dot(axis);
+                    min = min.min(projection);
+                    max = max.max(projection);
+                }
+
+                (min, max)
+            }
+        }
+    }
+}

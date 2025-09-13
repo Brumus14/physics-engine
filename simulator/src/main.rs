@@ -39,10 +39,7 @@ fn shape_to_mesh(shape: &Shape) -> Mesh {
     match shape {
         Shape::Point => Circle::new(POINT_SIZE).into(),
         Shape::Circle(radius) => Circle::new(radius.clone() as f32).into(),
-        Shape::Rectangle(size) => {
-            Rectangle::new(size.x.clone() as f32, size.y.clone() as f32).into()
-        }
-        Shape::Polygon(points) => {
+        Shape::Polygon { points, axes: _ } => {
             let shape: Vec<[f64; 2]> = points.iter().map(|p| [p[0], p[1]]).collect();
             let triangulation = shape.triangulate().to_triangulation();
 
@@ -81,7 +78,7 @@ fn spawn_physics_body(
             body.linear.position.y as f32,
             0.0,
         )
-        .with_rotation(Quat::from_rotation_z(-body.angular.rotation as f32)),
+        .with_rotation(Quat::from_rotation_z(-body.angular.orientation as f32)),
         BodyId(id),
     ));
 
@@ -174,28 +171,56 @@ fn startup(
 
     let mut bodies: Vec<Id> = Vec::new();
 
-    for i in 0..100 {
-        bodies.push(spawn_physics_body(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &mut physics_world,
-            Body::new_rigid(
-                LinearState::new(
-                    Vector::new(
-                        rng.random_range(-800.0..800.0),
-                        rng.random_range(-500.0..500.0),
-                    ),
-                    Vector::zeros(),
-                    1.0,
-                ),
-                1.0,
-                AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1.0),
-                Shape::Rectangle(Vector::new(100.0, 50.0)),
-            ),
-            Color::WHITE,
-        ));
-    }
+    // for i in 0..100 {
+    //     bodies.push(spawn_physics_body(
+    //         &mut commands,
+    //         &mut meshes,
+    //         &mut materials,
+    //         &mut physics_world,
+    //         Body::new_rigid(
+    //             LinearState::new(
+    //                 Vector::new(
+    //                     rng.random_range(-800.0..800.0),
+    //                     rng.random_range(-500.0..500.0),
+    //                 ),
+    //                 Vector::zeros(),
+    //                 1.0,
+    //             ),
+    //             1.0,
+    //             AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1.0),
+    //             Shape::new_rectangle(Vector::new(100.0, 50.0)),
+    //         ),
+    //         Color::WHITE,
+    //     ));
+    // }
+
+    bodies.push(spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::new_rigid(
+            LinearState::new(Vector::new(40.0, 200.0), Vector::zeros(), 1.0),
+            1.0,
+            AngularState::new(0.0, 0.0, 1.0),
+            Shape::new_rectangle(Vector::new(100.0, 50.0)),
+        ),
+        Color::WHITE,
+    ));
+
+    bodies.push(spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::new_rigid(
+            LinearState::new(Vector::new(0.0, 0.0), Vector::zeros(), 1.0),
+            1.0,
+            AngularState::new(0.0, 0.0, 1.0),
+            Shape::new_circle(25.0),
+        ),
+        Color::WHITE,
+    ));
 
     let ground = spawn_physics_body(
         &mut commands,
@@ -206,7 +231,7 @@ fn startup(
             LinearState::new(Vector::new(0.0, -500.0), Vector::zeros(), f64::INFINITY),
             0.8,
             AngularState::new(0.0, 0.0, 1.0),
-            Shape::Rectangle(Vector::new(1600.0, 50.0)),
+            Shape::new_rectangle(Vector::new(1600.0, 50.0)),
         ),
         Color::WHITE,
     );
@@ -248,7 +273,7 @@ fn update_physics(
         transform.translation.x = position.x as f32;
         transform.translation.y = position.y as f32;
 
-        let rotation = physics_world.get_body(*id).unwrap().angular.rotation;
+        let rotation = physics_world.get_body(*id).unwrap().angular.orientation;
         transform.rotation = Quat::from_rotation_z(-rotation as f32);
     }
 
@@ -258,6 +283,7 @@ fn update_physics(
         let spring = physics_world
             .get_effector(*id)
             .unwrap()
+            // Convert this into a function like as<Spring>
             .as_any()
             .downcast_ref::<Spring>()
             .unwrap();
