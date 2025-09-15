@@ -134,19 +134,40 @@ impl NarrowPhase for DefaultNarrowPhase {
             let Some(a) = bodies.get(a_id) else { continue };
             let Some(b) = bodies.get(b_id) else { continue };
 
-            let collision: Option<CollisionData> = if let Shape::Circle(a_radius) = &a.shape
-                && let Shape::Circle(b_radius) = &b.shape
-            {
-                DefaultNarrowPhase::detect_circle_circle(
-                    pair[0],
-                    &a.linear.position,
-                    *a_radius,
-                    pair[1],
-                    &b.linear.position,
-                    *b_radius,
-                )
-            } else {
-                DefaultNarrowPhase::detect_sat(
+            let collision = match (&a.shape, &b.shape) {
+                // How to handle points?
+                (Shape::Point, Shape::Point) => None,
+                (Shape::Point, Shape::Circle(b_radius)) => {
+                    DefaultNarrowPhase::detect_circle_circle(
+                        pair[0],
+                        &a.linear.position,
+                        0.0,
+                        pair[1],
+                        &b.linear.position,
+                        *b_radius,
+                    )
+                }
+                (Shape::Circle(a_radius), Shape::Point) => {
+                    DefaultNarrowPhase::detect_circle_circle(
+                        pair[0],
+                        &a.linear.position,
+                        *a_radius,
+                        pair[1],
+                        &b.linear.position,
+                        0.0,
+                    )
+                }
+                (Shape::Circle(a_radius), Shape::Circle(b_radius)) => {
+                    DefaultNarrowPhase::detect_circle_circle(
+                        pair[0],
+                        &a.linear.position,
+                        *a_radius,
+                        pair[1],
+                        &b.linear.position,
+                        *b_radius,
+                    )
+                }
+                _ => DefaultNarrowPhase::detect_sat(
                     pair[0],
                     &a.linear.position,
                     a.angular.orientation,
@@ -155,53 +176,8 @@ impl NarrowPhase for DefaultNarrowPhase {
                     &b.linear.position,
                     b.angular.orientation,
                     &b.shape,
-                )
+                ),
             };
-
-            // match &a.shape {
-            //     Shape::Circle(a_radius) => match &b.shape {
-            //         Shape::Circle(b_radius) => DefaultNarrowPhase::detect_circle_circle(
-            //             pair[0],
-            //             &a.linear.position,
-            //             *a_radius,
-            //             pair[1],
-            //             &b.linear.position,
-            //             *b_radius,
-            //         ),
-            //         // Dont actually need to match shapes?
-            //         Shape::Polygon { points, axes } => DefaultNarrowPhase::detect_sat(
-            //             pair[0],
-            //             &a.linear.position,
-            //             a.angular.orientation,
-            //             &a.shape,
-            //             pair[1],
-            //             &b.linear.position,
-            //             b.angular.orientation,
-            //             &b.shape,
-            //         ),
-            //         _ => None,
-            //     },
-            //     Shape::Polygon {
-            //         points: a_points,
-            //         axes: _,
-            //     } => match &b.shape {
-            //         Shape::Polygon {
-            //             points: b_points,
-            //             axes: _,
-            //         } => DefaultNarrowPhase::detect_sat(
-            //             pair[0],
-            //             &a.linear.position,
-            //             a.angular.orientation,
-            //             &a.shape,
-            //             pair[1],
-            //             &b.linear.position,
-            //             b.angular.orientation,
-            //             &b.shape,
-            //         ),
-            //         _ => None,
-            //     },
-            //     _ => None,
-            // };
 
             if let Some(collision) = collision {
                 self.collisions += 1;
@@ -227,11 +203,15 @@ impl DefaultNarrowPhase {
         let depth = a_radius + b_radius - distance;
         let normal = (b_position - a_position).normalize();
 
+        let a_point = a_position + normal * a_radius;
+        let b_point = b_position - normal * b_radius;
+        // Make separate point function
+        let point = (a_point * a_radius + b_point * b_radius) / (a_radius + b_radius);
+
         if depth > 0.0 {
             Some(CollisionData {
                 bodies: [a_id, b_id],
-                // No?
-                point: a_position + (a_radius - depth / 2.0) * normal,
+                point,
                 normal,
                 depth,
             })
@@ -243,9 +223,8 @@ impl DefaultNarrowPhase {
     // Separating Axis Theorem (SAT)
     // Take in normals?
     // Optimise
-    // Just pass in shape, add shape.project
     // Does / should this be collision when touching?
-    pub fn detect_sat(
+    fn detect_sat(
         a_id: Id,
         a_position: &Vector<f64>,
         a_orientation: f64,
@@ -273,12 +252,10 @@ impl DefaultNarrowPhase {
 
         let mut min_penetration = f64::INFINITY;
         let mut min_axis: Option<&Vector<f64>> = None;
-        let mut a_closest_point_index: usize;
-        let mut b_closest_point_index: usize;
 
         for axis in &axes {
-            let (a_min, a_max) = Shape::project(a_shape, axis, a_position, a_orientation);
-            let (b_min, b_max) = Shape::project(b_shape, axis, b_position, b_orientation);
+            let (a_min, a_max) = a_shape.project(axis, a_position, a_orientation);
+            let (b_min, b_max) = b_shape.project(axis, b_position, b_orientation);
 
             // Calculate penetration depth
             let penetration = a_max.min(b_max) - a_min.max(b_min);
@@ -304,14 +281,53 @@ impl DefaultNarrowPhase {
             collision_normal *= -1.0;
         }
 
+        let collision_point = match (a_shape, b_shape) {
+            // (Shape::Point, Shape::Point) => a_position,
+            // (Shape::Point, Shape::Circle(radius)) => {}
+            _ => Vector::zeros(),
+        };
+
+        let a_edge = a_shape.farthest_perpendicular_edge(&min_axis, a_position, a_orientation);
+        let b_edge = b_shape.farthest_perpendicular_edge(&-min_axis, b_position, b_orientation);
+
+        let (reference_edge, incident_edge, flipped) =
+            if (a_edge.0 - a_edge.1).normalize().dot(&min_axis).abs()
+                <= (b_edge.0 - b_edge.1).normalize().dot(&min_axis).abs()
+            {
+                (a_edge, b_edge, false)
+            } else {
+                (b_edge, a_edge, true)
+            };
+
+        let reference_vector = (a_edge.0 - a_edge.1).normalize();
+
+        println!("{}", collision_point);
+
         Some(CollisionData {
             bodies: [a_id, b_id],
             // Set point
-            point: b_position + Vector::new(-40.0, -25.0),
+            point: collision_point,
             normal: collision_normal,
             depth: min_penetration,
         })
     }
+
+    // fn clip(
+    //     mut edge: (Vector<f64>, Vector<f64>),
+    //     axis: &Vector<f64>,
+    //     end: f64,
+    // ) -> (Vector<f64>, Vector<f64>) {
+    //     let a = edge.0.dot(axis) - end;
+    //     let b = edge.1.dot(axis) - end;
+    //
+    //     let point = if a < 0.0 { &mut edge.0 } else { &mut edge.1 };
+    //
+    //     if a * b < 0.0 {
+    //         *point = (edge.1 - edge.0) * (a / (a - b)) + edge.0;
+    //     }
+    //
+    //     edge
+    // }
 }
 
 pub struct DefaultCollisionResolver {
@@ -339,34 +355,36 @@ impl CollisionResolution for DefaultCollisionResolver {
             let Some(b) = bodies.get(b_id) else { continue };
 
             let restitution = a.restitution * b.restitution;
-            let relative_velocity = b.linear.velocity - a.linear.velocity;
 
             let a_to_point = collision.point - a.linear.position;
             let a_to_point_perp = Vector::new(-a_to_point.y, a_to_point.x);
             let b_to_point = collision.point - b.linear.position;
             let b_to_point_perp = Vector::new(-b_to_point.y, b_to_point.x);
 
+            let relative_velocity = (b.linear.velocity + b.angular.velocity * b_to_point_perp)
+                - (a.linear.velocity + a.angular.velocity * a_to_point_perp);
+
             // Separate calculation for none angular bodies
             // What happens if one can rotate but other cant?
             let impulse_magnitude = -(1.0 + restitution) * relative_velocity.dot(&collision.normal)
                 / (1.0 / a.linear.mass
                     + 1.0 / b.linear.mass
-                    + a_to_point_perp.dot(&collision.normal).powi(2) / a.angular.inertia
-                    + b_to_point_perp.dot(&collision.normal).powi(2) / b.angular.inertia);
+                    + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
+                    + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia);
 
             let Some(a) = bodies.get_mut(a_id) else {
                 continue;
             };
             a.linear.velocity -= impulse_magnitude / a.linear.mass * collision.normal;
-            a.angular.velocity -=
-                a_to_point_perp.dot(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
+            a.angular.velocity +=
+                a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
 
             let Some(b) = bodies.get_mut(b_id) else {
                 continue;
             };
             b.linear.velocity += impulse_magnitude / b.linear.mass * collision.normal;
             b.angular.velocity -=
-                b_to_point_perp.dot(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
+                b_to_point.perp(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
 
             // Positional correction
             if collision.depth > self.correction_tolerance {

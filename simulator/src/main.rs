@@ -222,19 +222,19 @@ fn startup(
         Color::WHITE,
     ));
 
-    let ground = spawn_physics_body(
-        &mut commands,
-        &mut meshes,
-        &mut materials,
-        &mut physics_world,
-        Body::new_rigid(
-            LinearState::new(Vector::new(0.0, -500.0), Vector::zeros(), f64::INFINITY),
-            0.8,
-            AngularState::new(0.0, 0.0, 1.0),
-            Shape::new_rectangle(Vector::new(1600.0, 50.0)),
-        ),
-        Color::WHITE,
-    );
+    // let ground = spawn_physics_body(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::new_rigid(
+    //         LinearState::new(Vector::new(0.0, -500.0), Vector::zeros(), f64::INFINITY),
+    //         0.8,
+    //         AngularState::new(0.0, 0.0, 1.0),
+    //         Shape::new_rectangle(Vector::new(1600.0, 50.0)),
+    //     ),
+    //     Color::WHITE,
+    // );
 
     physics_world
         .world
@@ -243,13 +243,14 @@ fn startup(
     physics_world
         .world
         .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(
-            vec![bodies.as_slice(), &[ground]].concat(),
+            // vec![bodies.as_slice(), &[ground]].concat(),
+            bodies.clone(),
         )));
 
     physics_world
         .world
         .add_effector(Box::new(ConstantAcceleration::new(
-            bodies.clone(),
+            vec![bodies[0]],
             Vector::new(0.0, -200.0),
         )));
 }

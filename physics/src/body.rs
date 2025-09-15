@@ -61,6 +61,7 @@ impl LinearState {
 }
 
 #[derive(Clone)]
+// Counter clockwise is positive
 pub struct AngularState {
     pub orientation: f64,
     pub velocity: f64,
@@ -129,13 +130,13 @@ impl Shape {
     }
 
     pub fn project(
-        shape: &Shape,
+        &self,
         axis: &Vector<f64>,
         position: &Vector<f64>,
         orientation: f64,
     ) -> (f64, f64) {
         // Account for axis rotation
-        match shape {
+        match self {
             Shape::Point => {
                 let projection = position.dot(axis);
                 (projection, projection)
@@ -155,6 +156,58 @@ impl Shape {
                 }
 
                 (min, max)
+            }
+        }
+    }
+
+    // Is edge the best name, most perpendicular
+    pub fn farthest_perpendicular_edge(
+        &self,
+        axis: &Vector<f64>,
+        position: &Vector<f64>,
+        orientation: f64,
+    ) -> (Vector<f64>, Vector<f64>) {
+        match self {
+            Shape::Point => (*position, *position),
+            Shape::Circle(radius) => {
+                let point = position + *axis * *radius;
+                (point, point)
+            }
+            Shape::Polygon { points, axes: _ } => {
+                let mut max = f64::NEG_INFINITY;
+                let mut max_point_index = 0;
+
+                let global_points: Vec<Vector<f64>> = points
+                    .iter()
+                    .map(|p| position + Rotation::new(orientation) * p)
+                    .collect();
+
+                for i in 0..global_points.len() {
+                    let projection = global_points[i].dot(axis);
+
+                    if projection > max {
+                        max = projection;
+                        max_point_index = i;
+                    }
+                }
+
+                let point = global_points[max_point_index];
+                let (a, b) = (
+                    global_points
+                        [(max_point_index + global_points.len() - 1) % global_points.len()],
+                    global_points[(max_point_index + 1) % global_points.len()],
+                );
+
+                let a_edge = (point, a);
+                let b_edge = (point, b);
+
+                if (point - a).normalize().dot(&axis).abs()
+                    <= (point - b).normalize().dot(&axis).abs()
+                {
+                    a_edge
+                } else {
+                    b_edge
+                }
             }
         }
     }
