@@ -167,16 +167,26 @@ impl NarrowPhase for DefaultNarrowPhase {
                         *b_radius,
                     )
                 }
-                _ => DefaultNarrowPhase::detect_sat(
+                (
+                    Shape::Polygon {
+                        points: a_points,
+                        axes: a_axes,
+                    },
+                    Shape::Polygon {
+                        points: b_points,
+                        axes: b_axes,
+                    },
+                ) => DefaultNarrowPhase::detect_sat(
                     pair[0],
                     &a.linear.position,
-                    a.angular.orientation,
-                    &a.shape,
+                    a_points,
+                    a_axes,
                     pair[1],
                     &b.linear.position,
-                    b.angular.orientation,
-                    &b.shape,
+                    b_points,
+                    b_axes,
                 ),
+                _ => None,
             };
 
             if let Some(collision) = collision {
@@ -224,38 +234,35 @@ impl DefaultNarrowPhase {
     // Take in normals?
     // Optimise
     // Does / should this be collision when touching?
+    // Takes global points
     fn detect_sat(
         a_id: Id,
         a_position: &Vector<f64>,
-        a_orientation: f64,
-        a_shape: &Shape,
+        a_points: &Vec<Vector<f64>>,
+        a_axes: &Vec<Vector<f64>>,
         b_id: Id,
         b_position: &Vector<f64>,
-        b_orientation: f64,
-        b_shape: &Shape,
+        b_points: &Vec<Vector<f64>>,
+        b_axes: &Vec<Vector<f64>>,
     ) -> Option<CollisionData> {
         // Pass in axes maybe
         let mut axes: Vec<Vector<f64>> = Vec::new();
 
         // Dont add duplicate axes
-        if let Shape::Polygon { points: _, axes: a } = a_shape {
-            for axis in a {
-                axes.push(*axis);
-            }
+        for axis in a_axes {
+            axes.push(*axis);
         }
 
-        if let Shape::Polygon { points: _, axes: a } = b_shape {
-            for axis in a {
-                axes.push(-*axis);
-            }
+        for axis in b_axes {
+            axes.push(-*axis);
         }
 
         let mut min_penetration = f64::INFINITY;
         let mut min_axis: Option<&Vector<f64>> = None;
 
         for axis in &axes {
-            let (a_min, a_max) = a_shape.project(axis, a_position, a_orientation);
-            let (b_min, b_max) = b_shape.project(axis, b_position, b_orientation);
+            let (a_min, a_max) = DefaultNarrowPhase::project(a_points, axis);
+            let (b_min, b_max) = DefaultNarrowPhase::project(b_points, axis);
 
             // Calculate penetration depth
             let penetration = a_max.min(b_max) - a_min.max(b_min);
@@ -281,53 +288,101 @@ impl DefaultNarrowPhase {
             collision_normal *= -1.0;
         }
 
-        let collision_point = match (a_shape, b_shape) {
-            // (Shape::Point, Shape::Point) => a_position,
-            // (Shape::Point, Shape::Circle(radius)) => {}
-            _ => Vector::zeros(),
+        let a_edge = DefaultNarrowPhase::farthest_perpendicular_edge(a_points, &min_axis);
+        let b_edge = DefaultNarrowPhase::farthest_perpendicular_edge(b_points, &-min_axis);
+
+        let (reference, incident) = if (a_edge.0 - a_edge.1)
+            .normalize()
+            .dot(&collision_normal)
+            .abs()
+            <= (b_edge.0 - b_edge.1)
+                .normalize()
+                .dot(&collision_normal)
+                .abs()
+        {
+            (a_edge, b_edge)
+        } else {
+            (b_edge, a_edge)
         };
-
-        let a_edge = a_shape.farthest_perpendicular_edge(&min_axis, a_position, a_orientation);
-        let b_edge = b_shape.farthest_perpendicular_edge(&-min_axis, b_position, b_orientation);
-
-        let (reference_edge, incident_edge, flipped) =
-            if (a_edge.0 - a_edge.1).normalize().dot(&min_axis).abs()
-                <= (b_edge.0 - b_edge.1).normalize().dot(&min_axis).abs()
-            {
-                (a_edge, b_edge, false)
-            } else {
-                (b_edge, a_edge, true)
-            };
-
-        let reference_vector = (a_edge.0 - a_edge.1).normalize();
-
-        println!("{}", collision_point);
 
         Some(CollisionData {
             bodies: [a_id, b_id],
             // Set point
-            point: collision_point,
+            point: *collision_point,
             normal: collision_normal,
             depth: min_penetration,
         })
     }
 
-    // fn clip(
-    //     mut edge: (Vector<f64>, Vector<f64>),
-    //     axis: &Vector<f64>,
-    //     end: f64,
-    // ) -> (Vector<f64>, Vector<f64>) {
-    //     let a = edge.0.dot(axis) - end;
-    //     let b = edge.1.dot(axis) - end;
-    //
-    //     let point = if a < 0.0 { &mut edge.0 } else { &mut edge.1 };
-    //
-    //     if a * b < 0.0 {
-    //         *point = (edge.1 - edge.0) * (a / (a - b)) + edge.0;
-    //     }
-    //
-    //     edge
-    // }
+    fn project(points: &Vec<Vector<f64>>, axis: &Vector<f64>) -> (f64, f64) {
+        let mut min = f64::INFINITY;
+        let mut max = f64::NEG_INFINITY;
+
+        for point in points {
+            let projection = point.dot(axis);
+            min = min.min(projection);
+            max = max.max(projection);
+        }
+
+        (min, max)
+    }
+
+    fn farthest_perpendicular_edge(
+        points: &Vec<Vector<f64>>,
+        axis: &Vector<f64>,
+    ) -> (Vector<f64>, Vector<f64>) {
+        let mut max = f64::NEG_INFINITY;
+        let mut max_point_index = 0;
+
+        for i in 0..points.len() {
+            let projection = points[i].dot(axis);
+
+            if projection > max {
+                max = projection;
+                max_point_index = i;
+            }
+        }
+
+        let point = points[max_point_index];
+        let (a, b) = (
+            points[(max_point_index + points.len() - 1) % points.len()],
+            points[(max_point_index + 1) % points.len()],
+        );
+
+        let a_edge = (point, a);
+        let b_edge = (point, b);
+
+        if (point - a).normalize().dot(&axis).abs() <= (point - b).normalize().dot(&axis).abs() {
+            a_edge
+        } else {
+            b_edge
+        }
+    }
+
+    fn clip(
+        edge: (Vector<f64>, Vector<f64>),
+        normal: &Vector<f64>,
+        offset: f64,
+    ) -> Vec<Vector<f64>> {
+        let mut points = Vec::new();
+
+        let a = edge.0.dot(normal) - offset;
+        let b = edge.1.dot(normal) - offset;
+
+        if a >= 0.0 {
+            points.push(edge.0);
+        }
+
+        if b >= 0.0 {
+            points.push(edge.1);
+        }
+
+        if a * b < 0.0 {
+            points.push((edge.1 - edge.0) * (a / (a - b)) + edge.0);
+        }
+
+        points
+    }
 }
 
 pub struct DefaultCollisionResolver {
@@ -376,14 +431,14 @@ impl CollisionResolution for DefaultCollisionResolver {
                 continue;
             };
             a.linear.velocity -= impulse_magnitude / a.linear.mass * collision.normal;
-            a.angular.velocity +=
+            a.angular.velocity -=
                 a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
 
             let Some(b) = bodies.get_mut(b_id) else {
                 continue;
             };
             b.linear.velocity += impulse_magnitude / b.linear.mass * collision.normal;
-            b.angular.velocity -=
+            b.angular.velocity +=
                 b_to_point.perp(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
 
             // Positional correction

@@ -200,9 +200,9 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(40.0, 200.0), Vector::zeros(), 1.0),
+            LinearState::new(Vector::new(0.0, 200.0), Vector::zeros(), 1.0),
             1.0,
-            AngularState::new(0.0, 0.0, 1.0),
+            AngularState::new(0.2, 0.0, 1.0),
             Shape::new_rectangle(Vector::new(100.0, 50.0)),
         ),
         Color::WHITE,
@@ -214,10 +214,10 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(0.0, 0.0), Vector::zeros(), 1.0),
+            LinearState::new(Vector::new(0.0, 0.0), Vector::zeros(), f64::INFINITY),
             1.0,
             AngularState::new(0.0, 0.0, 1.0),
-            Shape::new_circle(25.0),
+            Shape::new_rectangle(Vector::new(100.0, 50.0)),
         ),
         Color::WHITE,
     ));
