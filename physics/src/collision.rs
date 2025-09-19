@@ -40,8 +40,7 @@ pub trait CollisionResolution {
 #[derive(Debug)]
 pub struct CollisionData {
     pub bodies: [Id; 2],
-    // Maybe use Point instead
-    pub point: Vector<f64>,
+    pub points: Vec<Vector<f64>>,
     // From a to b
     pub normal: Vector<f64>,
     pub depth: f64,
