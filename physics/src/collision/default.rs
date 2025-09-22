@@ -204,6 +204,7 @@ impl NarrowPhase for DefaultNarrowPhase {
             if let Some(collision) = collision {
                 self.collisions += 1;
                 println!("{:?}", collision);
+                // println!("collided");
                 collisions.push(collision);
             }
         }
@@ -274,12 +275,18 @@ impl DefaultNarrowPhase {
         let mut min_penetration = f64::INFINITY;
         let mut min_axis: Option<&Vector<f64>> = None;
 
+        println!("{:?}", a_points);
+
         for axis in &axes {
             let (a_min, a_max) = DefaultNarrowPhase::project(a_points, axis);
             let (b_min, b_max) = DefaultNarrowPhase::project(b_points, axis);
 
             // Calculate penetration depth
             let penetration = a_max.min(b_max) - a_min.max(b_min);
+            println!(
+                "{} ({} {}) ({} {}) {}",
+                axis, a_min, a_max, b_min, b_max, penetration
+            );
 
             if b_min >= a_max || a_min >= b_max {
                 // Axis has no intersection so no collision
@@ -321,7 +328,7 @@ impl DefaultNarrowPhase {
         let reference_edge = (reference.1 - reference.0).normalize();
 
         // Collision not detected when inside each other might be due to return Nones below
-
+        // None returning may be missing collisions
         // mut or shadow
         let mut clipped =
             DefaultNarrowPhase::clip(incident, reference_edge, reference_edge.dot(&reference.0));
@@ -343,14 +350,13 @@ impl DefaultNarrowPhase {
         // negate?
         let reference_normal = Vector::new(-reference_edge.y, reference_edge.x);
         let offset = reference_normal.dot(&reference.0);
-        let points = clipped
+        let points: Vec<Vector<f64>> = clipped
             .into_iter()
             .filter(|p| p.dot(&reference_normal) >= offset)
             .collect();
 
         Some(CollisionData {
             bodies: [a_id, b_id],
-            // Set point
             points,
             normal: collision_normal,
             depth: min_penetration,
@@ -447,61 +453,67 @@ impl CollisionResolution for DefaultCollisionResolver {
 
     fn resolve(&mut self, collisions: Vec<CollisionData>, bodies: &mut IdMap<Body>) {
         for collision in collisions {
-            // Make a get disjoint mut for bodies
+            if collision.points.len() == 0 {
+                continue;
+            }
+
             let (a_id, b_id) = (collision.bodies[0], collision.bodies[1]);
-            let Some(a) = bodies.get(a_id) else { continue };
-            let Some(b) = bodies.get(b_id) else { continue };
+            let [Some(a), Some(b)] = bodies.get_disjoint_mut([a_id, b_id]) else {
+                continue;
+            };
 
             let restitution = a.restitution * b.restitution;
 
-            // Get rid of this
-            if let Some(point) = collision.points.get(0) {
-                let a_to_point = point - a.linear.position;
-                let a_to_point_perp = Vector::new(-a_to_point.y, a_to_point.x);
-                let b_to_point = point - b.linear.position;
-                let b_to_point_perp = Vector::new(-b_to_point.y, b_to_point.x);
+            let point = collision
+                .points
+                .iter()
+                .fold(Vector::new(0.0, 0.0), |a, p| a + p)
+                / collision.points.len() as f64;
 
-                let relative_velocity = (b.linear.velocity + b.angular.velocity * b_to_point_perp)
-                    - (a.linear.velocity + a.angular.velocity * a_to_point_perp);
+            let a_to_point = point - a.linear.position;
+            let a_to_point_perp = Vector::new(-a_to_point.y, a_to_point.x);
+            let b_to_point = point - b.linear.position;
+            let b_to_point_perp = Vector::new(-b_to_point.y, b_to_point.x);
 
-                // Separate calculation for none angular bodies
-                // What happens if one can rotate but other cant?
-                let impulse_magnitude = -(1.0 + restitution)
-                    * relative_velocity.dot(&collision.normal)
-                    / (1.0 / a.linear.mass
-                        + 1.0 / b.linear.mass
-                        + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
-                        + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia);
+            let relative_velocity = (b.linear.velocity + b.angular.velocity * b_to_point_perp)
+                - (a.linear.velocity + a.angular.velocity * a_to_point_perp);
 
-                let Some(a) = bodies.get_mut(a_id) else {
-                    continue;
-                };
-                a.linear.velocity -= impulse_magnitude / a.linear.mass * collision.normal;
-                // Should this actually be negative
-                a.angular.velocity -=
-                    a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
+            // Separate calculation for none angular bodies
+            // What happens if one can rotate but other cant?
+            let impulse_magnitude = -(1.0 + restitution) * relative_velocity.dot(&collision.normal)
+                / (1.0 / a.linear.mass
+                    + 1.0 / b.linear.mass
+                    + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
+                    + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia);
 
-                let Some(b) = bodies.get_mut(b_id) else {
-                    continue;
-                };
-                b.linear.velocity += impulse_magnitude / b.linear.mass * collision.normal;
-                b.angular.velocity +=
-                    b_to_point.perp(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
+            // println!(
+            //     "{} {} {} {} {} {} {} {}",
+            //     a_to_point.perp(&collision.normal).powi(2),
+            //     a.linear.velocity,
+            //     relative_velocity,
+            //     a_to_point,
+            //     b_to_point,
+            //     impulse_magnitude,
+            //     impulse_magnitude / a.linear.mass * collision.normal,
+            //     a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia
+            // );
 
-                // Positional correction
-                if collision.depth > self.correction_tolerance {
-                    let Some(a) = bodies.get(a_id) else { continue };
-                    let Some(b) = bodies.get(b_id) else { continue };
+            a.linear.velocity -= (impulse_magnitude / a.linear.mass) * collision.normal;
+            // Should this actually be negative
+            a.angular.velocity -=
+                a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
+
+            b.linear.velocity += (impulse_magnitude / b.linear.mass) * collision.normal;
+            b.angular.velocity +=
+                b_to_point.perp(&(impulse_magnitude * collision.normal)) / b.angular.inertia;
+
+            // Positional correction
+            if collision.depth > self.correction_tolerance {
+                if a.linear.mass != f64::INFINITY && b.linear.mass != f64::INFINITY {
                     let correction = (collision.depth * self.correction_level * collision.normal)
                         / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
 
-                    let Some(a) = bodies.get_mut(a_id) else {
-                        continue;
-                    };
                     a.linear.position -= correction / a.linear.mass;
-                    let Some(b) = bodies.get_mut(b_id) else {
-                        continue;
-                    };
                     b.linear.position += correction / b.linear.mass;
                 }
             }

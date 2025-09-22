@@ -73,6 +73,10 @@ impl<T> IdMap<T> {
         }
     }
 
+    pub fn get_disjoint_mut<const N: usize>(&mut self, ids: [Id; N]) -> [&mut Option<T>; N] {
+        self.values.get_disjoint_mut(ids).unwrap()
+    }
+
     pub fn values(&self) -> impl Iterator<Item = &T> {
         self.values.iter().filter_map(|v| v.as_ref())
     }

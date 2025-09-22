@@ -78,7 +78,7 @@ fn spawn_physics_body(
             body.linear.position.y as f32,
             0.0,
         )
-        .with_rotation(Quat::from_rotation_z(-body.angular.orientation as f32)),
+        .with_rotation(Quat::from_rotation_z(body.angular.orientation as f32)),
         BodyId(id),
     ));
 
@@ -255,9 +255,9 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(20.0, 100.0), Vector::new(0.0, -40.0), 1.0),
+            LinearState::new(Vector::new(90.0, 100.0), Vector::new(0.0, -20.0), 1.0),
             1.0,
-            AngularState::new(0.0, 0.0, 1000.0),
+            AngularState::new(0.0, 0.0, 1.0),
             Shape::new_rectangle(Vector::new(100.0, 50.0)),
         ),
         Color::WHITE,
@@ -269,13 +269,27 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(0.0, -100.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
             1.0,
-            AngularState::new(0.0, 0.0, 1000.0),
+            AngularState::new(0.0, 0.0, 1.0),
             Shape::new_rectangle(Vector::new(100.0, 50.0)),
         ),
-        Color::WHITE,
+        Color::BLACK,
     ));
+
+    // bodies.push(spawn_physics_body(
+    //     &mut commands,
+    //     &mut meshes,
+    //     &mut materials,
+    //     &mut physics_world,
+    //     Body::new_rigid(
+    //         LinearState::new(Vector::new(0.0, -300.0), Vector::new(0.0, 50.0), 1.0),
+    //         1.0,
+    //         AngularState::new(0.4, 0.0, 1000.0),
+    //         Shape::new_rectangle(Vector::new(100.0, 50.0)),
+    //     ),
+    //     Color::WHITE,
+    // ));
 
     physics_world
         .world
@@ -306,7 +320,7 @@ fn update_physics(
         transform.translation.y = position.y as f32;
 
         let rotation = physics_world.get_body(*id).unwrap().angular.orientation;
-        transform.rotation = Quat::from_rotation_z(-rotation as f32);
+        transform.rotation = Quat::from_rotation_z(rotation as f32);
     }
 
     for (body, mut transform) in spring_query.iter_mut() {
