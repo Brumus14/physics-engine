@@ -171,83 +171,28 @@ fn startup(
 
     let mut bodies: Vec<Id> = Vec::new();
 
-    // for i in 0..10 {
-    //     bodies.push(spawn_physics_body(
-    //         &mut commands,
-    //         &mut meshes,
-    //         &mut materials,
-    //         &mut physics_world,
-    //         Body::new_rigid(
-    //             LinearState::new(
-    //                 Vector::new(
-    //                     rng.random_range(-800.0..800.0),
-    //                     rng.random_range(-500.0..500.0),
-    //                 ),
-    //                 Vector::zeros(),
-    //                 1.0,
-    //             ),
-    //             1.0,
-    //             AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1000.0),
-    //             Shape::new_rectangle(Vector::new(100.0, 50.0)),
-    //         ),
-    //         Color::WHITE,
-    //     ));
-    // }
-
-    // bodies.push(spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::new_rigid(
-    //         LinearState::new(Vector::new(0.0, 400.0), Vector::zeros(), 1.0),
-    //         1.0,
-    //         AngularState::new(0.2, 0.0, 1000.0),
-    //         Shape::new_rectangle(Vector::new(100.0, 50.0)),
-    //     ),
-    //     Color::WHITE,
-    // ));
-    //
-    // bodies.push(spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::new_rigid(
-    //         LinearState::new(Vector::new(0.0, 200.0), Vector::zeros(), 1.0),
-    //         1.0,
-    //         AngularState::new(0.4, 0.0, 1000.0),
-    //         Shape::new_rectangle(Vector::new(100.0, 50.0)),
-    //     ),
-    //     Color::WHITE,
-    // ));
-
-    // let sun = spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::new_rigid(
-    //         LinearState::new(Vector::new(0.0, 0.0), Vector::zeros(), 100.0),
-    //         1.0,
-    //         AngularState::new(0.0, 0.0, 1.0),
-    //         Shape::new_circle(25.0),
-    //     ),
-    //     Color::WHITE,
-    // );
-
-    // They start rotating like crazy because they keep colliding with the ground
-    // physics_world
-    //     .world
-    //     .add_effector(Box::new(ConstantAcceleration::new(
-    //         bodies.clone(),
-    //         Vector::new(0.0, -200.0),
-    //     )));
-
-    // physics_world.world.add_effector(Box::new(Gravity::new(
-    //     vec![bodies.as_slice(), &[sun]].concat(),
-    //     10000.0,
-    // )));
+    for i in 0..100 {
+        bodies.push(spawn_physics_body(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut physics_world,
+            Body::new_rigid(
+                LinearState::new(
+                    Vector::new(
+                        rng.random_range(-800.0..800.0),
+                        rng.random_range(-500.0..500.0),
+                    ),
+                    Vector::zeros(),
+                    1.0,
+                ),
+                1.0,
+                AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1000.0),
+                Shape::new_circle(25.0),
+            ),
+            Color::WHITE,
+        ));
+    }
 
     bodies.push(spawn_physics_body(
         &mut commands,
@@ -255,10 +200,25 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(90.0, 100.0), Vector::new(0.0, -20.0), 1.0),
+            LinearState::new(Vector::new(0.0, 0.0), Vector::zeros(), 1.0),
             1.0,
-            AngularState::new(0.0, 0.0, 1.0),
-            Shape::new_rectangle(Vector::new(100.0, 50.0)),
+            AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1000.0),
+            Shape::new_polygon(vec![
+                Vector::new(0.0, 60.0),
+                Vector::new(25.0, 55.0),
+                Vector::new(50.0, 40.0),
+                Vector::new(65.0, 15.0),
+                Vector::new(70.0, -10.0),
+                Vector::new(60.0, -35.0),
+                Vector::new(40.0, -55.0),
+                Vector::new(15.0, -65.0),
+                Vector::new(-15.0, -65.0),
+                Vector::new(-40.0, -55.0),
+                Vector::new(-60.0, -35.0),
+                Vector::new(-70.0, -10.0),
+                Vector::new(-65.0, 20.0),
+                Vector::new(-45.0, 45.0),
+            ]),
         ),
         Color::WHITE,
     ));
@@ -269,35 +229,54 @@ fn startup(
         &mut materials,
         &mut physics_world,
         Body::new_rigid(
-            LinearState::new(Vector::new(0.0, 0.0), Vector::new(0.0, 0.0), 1.0),
+            LinearState::new(Vector::new(200.0, 0.0), Vector::zeros(), 1.0),
             1.0,
-            AngularState::new(0.0, 0.0, 1.0),
-            Shape::new_rectangle(Vector::new(100.0, 50.0)),
+            AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1000.0),
+            Shape::new_polygon(vec![
+                Vector::new(0.0, 60.0),
+                Vector::new(-50.0, -40.0),
+                Vector::new(50.0, -40.0),
+            ]),
         ),
-        Color::BLACK,
+        Color::WHITE,
     ));
 
-    // bodies.push(spawn_physics_body(
-    //     &mut commands,
-    //     &mut meshes,
-    //     &mut materials,
-    //     &mut physics_world,
-    //     Body::new_rigid(
-    //         LinearState::new(Vector::new(0.0, -300.0), Vector::new(0.0, 50.0), 1.0),
-    //         1.0,
-    //         AngularState::new(0.4, 0.0, 1000.0),
-    //         Shape::new_rectangle(Vector::new(100.0, 50.0)),
-    //     ),
-    //     Color::WHITE,
-    // ));
+    let ground = spawn_physics_body(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &mut physics_world,
+        Body::new_rigid(
+            LinearState::new(
+                Vector::new(0.0, -500.0),
+                Vector::new(0.0, 0.0),
+                f64::INFINITY,
+            ),
+            0.5,
+            AngularState::new(0.0, 0.0, f64::INFINITY),
+            Shape::new_rectangle(Vector::new(1600.0, 50.0)),
+        ),
+        Color::BLACK,
+    );
 
     physics_world
         .world
-        .add_integrator(Box::new(SemiImplicitEuler::new(bodies.clone())));
+        .add_effector(Box::new(ConstantAcceleration::new(
+            bodies.clone(),
+            Vector::new(0.0, -100.0),
+        )));
 
     physics_world
         .world
-        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(bodies.clone())));
+        .add_integrator(Box::new(SemiImplicitEuler::new(
+            [bodies.as_slice(), &[ground]].concat(),
+        )));
+
+    physics_world
+        .world
+        .add_collision_pipeline(Box::new(DefaultCollisionPipeline::new(
+            [bodies.as_slice(), &[ground]].concat(),
+        )));
 }
 
 fn update_physics(

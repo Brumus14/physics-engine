@@ -168,6 +168,48 @@ impl NarrowPhase for DefaultNarrowPhase {
                     )
                 }
                 (
+                    Shape::Circle(a_radius),
+                    Shape::Polygon {
+                        points: b_points,
+                        axes: b_axes,
+                    },
+                ) => DefaultNarrowPhase::detect_sat_circle(
+                    pair[1],
+                    &b.linear.position,
+                    &b_points
+                        .iter()
+                        .map(|p| b.linear.position + Rotation::new(b.angular.orientation) * p)
+                        .collect(),
+                    &b_axes
+                        .iter()
+                        .map(|axis| Rotation::new(b.angular.orientation) * axis)
+                        .collect(),
+                    pair[0],
+                    &a.linear.position,
+                    *a_radius,
+                ),
+                (
+                    Shape::Polygon {
+                        points: a_points,
+                        axes: a_axes,
+                    },
+                    Shape::Circle(b_radius),
+                ) => DefaultNarrowPhase::detect_sat_circle(
+                    pair[0],
+                    &a.linear.position,
+                    &a_points
+                        .iter()
+                        .map(|p| a.linear.position + Rotation::new(a.angular.orientation) * p)
+                        .collect(),
+                    &a_axes
+                        .iter()
+                        .map(|axis| Rotation::new(a.angular.orientation) * axis)
+                        .collect(),
+                    pair[1],
+                    &b.linear.position,
+                    *b_radius,
+                ),
+                (
                     Shape::Polygon {
                         points: a_points,
                         axes: a_axes,
@@ -203,8 +245,6 @@ impl NarrowPhase for DefaultNarrowPhase {
 
             if let Some(collision) = collision {
                 self.collisions += 1;
-                println!("{:?}", collision);
-                // println!("collided");
                 collisions.push(collision);
             }
         }
@@ -228,8 +268,7 @@ impl DefaultNarrowPhase {
 
         let a_point = a_position + normal * a_radius;
         let b_point = b_position - normal * b_radius;
-        // Make separate point function
-        let point = (a_point * a_radius + b_point * b_radius) / (a_radius + b_radius);
+        let point = (a_point + b_point) / 2.0;
 
         if depth > 0.0 {
             Some(CollisionData {
@@ -243,50 +282,40 @@ impl DefaultNarrowPhase {
         }
     }
 
-    // Separating Axis Theorem (SAT)
-    // Take in normals?
-    // Optimise
-    // Does / should this be collision when touching?
-    // Takes global points
-    fn detect_sat(
+    fn detect_sat_circle(
         a_id: Id,
         a_position: &Vector<f64>,
         a_points: &Vec<Vector<f64>>,
         a_axes: &Vec<Vector<f64>>,
         b_id: Id,
         b_position: &Vector<f64>,
-        b_points: &Vec<Vector<f64>>,
-        b_axes: &Vec<Vector<f64>>,
+        b_radius: f64,
     ) -> Option<CollisionData> {
-        // Pass in axes maybe
-        let mut axes: Vec<Vector<f64>> = Vec::new();
+        let mut closest_point: Option<&Vector<f64>> = None;
+        let mut closest_distance = f64::INFINITY;
 
-        // Dont add duplicate axes
-        // Make better
-        // No negative
-        for axis in a_axes {
-            axes.push(*axis);
+        for point in a_points {
+            let distance = point.metric_distance(b_position);
+
+            if distance < closest_distance {
+                closest_distance = distance;
+                closest_point = Some(point);
+            }
         }
 
-        for axis in b_axes {
-            axes.push(*axis);
-        }
+        let mut axes = a_axes.clone();
+        axes.push((closest_point.unwrap() - b_position).normalize());
 
         let mut min_penetration = f64::INFINITY;
         let mut min_axis: Option<&Vector<f64>> = None;
 
-        println!("{:?}", a_points);
-
         for axis in &axes {
             let (a_min, a_max) = DefaultNarrowPhase::project(a_points, axis);
-            let (b_min, b_max) = DefaultNarrowPhase::project(b_points, axis);
+            let b_position = b_position.dot(&axis);
+            let (b_min, b_max) = (b_position - b_radius, b_position + b_radius);
 
             // Calculate penetration depth
             let penetration = a_max.min(b_max) - a_min.max(b_min);
-            println!(
-                "{} ({} {}) ({} {}) {}",
-                axis, a_min, a_max, b_min, b_max, penetration
-            );
 
             if b_min >= a_max || a_min >= b_max {
                 // Axis has no intersection so no collision
@@ -301,7 +330,61 @@ impl DefaultNarrowPhase {
 
         let min_axis = min_axis.unwrap().clone();
 
-        // Make sure it points from a to b
+        // Ensure it points from a to b
+        let collision_normal = if (b_position - a_position).dot(&min_axis) >= 0.0 {
+            min_axis
+        } else {
+            -min_axis
+        };
+
+        let point = b_position - (b_radius - min_penetration / 2.0) * collision_normal;
+
+        Some(CollisionData {
+            bodies: [a_id, b_id],
+            points: vec![point],
+            normal: collision_normal,
+            depth: min_penetration,
+        })
+    }
+
+    // Separating Axis Theorem (SAT)
+    fn detect_sat(
+        a_id: Id,
+        a_position: &Vector<f64>,
+        a_points: &Vec<Vector<f64>>,
+        a_axes: &Vec<Vector<f64>>,
+        b_id: Id,
+        b_position: &Vector<f64>,
+        b_points: &Vec<Vector<f64>>,
+        b_axes: &Vec<Vector<f64>>,
+    ) -> Option<CollisionData> {
+        let mut axes: Vec<Vector<f64>> = a_axes.clone();
+        axes.extend(b_axes);
+
+        let mut min_penetration = f64::INFINITY;
+        let mut min_axis: Option<&Vector<f64>> = None;
+
+        for axis in &axes {
+            let (a_min, a_max) = DefaultNarrowPhase::project(a_points, axis);
+            let (b_min, b_max) = DefaultNarrowPhase::project(b_points, axis);
+
+            // Calculate penetration depth
+            let penetration = a_max.min(b_max) - a_min.max(b_min);
+
+            if b_min >= a_max || a_min >= b_max {
+                // Axis has no intersection so no collision
+                return None;
+            } else {
+                if penetration < min_penetration {
+                    min_penetration = penetration;
+                    min_axis = Some(axis);
+                }
+            }
+        }
+
+        let min_axis = min_axis.unwrap().clone();
+
+        // Ensure it points from a to b
         let collision_normal = if (b_position - a_position).dot(&min_axis) >= 0.0 {
             min_axis
         } else {
@@ -327,9 +410,6 @@ impl DefaultNarrowPhase {
 
         let reference_edge = (reference.1 - reference.0).normalize();
 
-        // Collision not detected when inside each other might be due to return Nones below
-        // None returning may be missing collisions
-        // mut or shadow
         let mut clipped =
             DefaultNarrowPhase::clip(incident, reference_edge, reference_edge.dot(&reference.0));
 
@@ -347,7 +427,6 @@ impl DefaultNarrowPhase {
             return None;
         }
 
-        // negate?
         let reference_normal = Vector::new(-reference_edge.y, reference_edge.x);
         let offset = reference_normal.dot(&reference.0);
         let points: Vec<Vector<f64>> = clipped
@@ -464,6 +543,7 @@ impl CollisionResolution for DefaultCollisionResolver {
 
             let restitution = a.restitution * b.restitution;
 
+            // Must be a more correct way for multiple points
             let point = collision
                 .points
                 .iter()
@@ -486,20 +566,7 @@ impl CollisionResolution for DefaultCollisionResolver {
                     + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
                     + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia);
 
-            // println!(
-            //     "{} {} {} {} {} {} {} {}",
-            //     a_to_point.perp(&collision.normal).powi(2),
-            //     a.linear.velocity,
-            //     relative_velocity,
-            //     a_to_point,
-            //     b_to_point,
-            //     impulse_magnitude,
-            //     impulse_magnitude / a.linear.mass * collision.normal,
-            //     a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia
-            // );
-
             a.linear.velocity -= (impulse_magnitude / a.linear.mass) * collision.normal;
-            // Should this actually be negative
             a.angular.velocity -=
                 a_to_point.perp(&(impulse_magnitude * collision.normal)) / a.angular.inertia;
 
@@ -509,13 +576,11 @@ impl CollisionResolution for DefaultCollisionResolver {
 
             // Positional correction
             if collision.depth > self.correction_tolerance {
-                if a.linear.mass != f64::INFINITY && b.linear.mass != f64::INFINITY {
-                    let correction = (collision.depth * self.correction_level * collision.normal)
-                        / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
+                let correction = (collision.depth * self.correction_level * collision.normal)
+                    / (1.0 / a.linear.mass + 1.0 / b.linear.mass);
 
-                    a.linear.position -= correction / a.linear.mass;
-                    b.linear.position += correction / b.linear.mass;
-                }
+                a.linear.position -= correction / a.linear.mass;
+                b.linear.position += correction / b.linear.mass;
             }
         }
     }

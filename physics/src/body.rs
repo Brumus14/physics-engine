@@ -108,13 +108,12 @@ impl Shape {
         }
     }
 
-    // Counter clockwise points
     pub fn new_polygon(points: Vec<Vector<f64>>) -> Self {
         let mut axes: Vec<Vector<f64>> = Vec::new();
 
         for i in 0..points.len() {
             let line = (points[(i + 1) % points.len()] - points[i]).normalize();
-            let normal = Vector::new(line.y, -line.x);
+            let axis = Vector::new(line.y, -line.x);
 
             // let duplicate_axis = axes.iter().any(|a| {
             //     // Move to const
@@ -122,93 +121,10 @@ impl Shape {
             // });
             //
             // if !duplicate_axis {
-            axes.push(normal);
+            axes.push(axis);
             // }
         }
 
         Shape::Polygon { points, axes }
-    }
-
-    pub fn project(
-        &self,
-        axis: &Vector<f64>,
-        position: &Vector<f64>,
-        orientation: f64,
-    ) -> (f64, f64) {
-        // Account for axis rotation
-        match self {
-            Shape::Point => {
-                let projection = position.dot(axis);
-                (projection, projection)
-            }
-            Shape::Circle(radius) => {
-                let projection = position.dot(axis);
-                (projection - radius, projection + radius)
-            }
-            Shape::Polygon { points, axes: _ } => {
-                let mut min = f64::INFINITY;
-                let mut max = f64::NEG_INFINITY;
-
-                for point in points {
-                    let projection = (position + Rotation::new(orientation) * point).dot(axis);
-                    min = min.min(projection);
-                    max = max.max(projection);
-                }
-
-                (min, max)
-            }
-        }
-    }
-
-    // Is edge the best name, most perpendicular
-    pub fn farthest_perpendicular_edge(
-        &self,
-        axis: &Vector<f64>,
-        position: &Vector<f64>,
-        orientation: f64,
-    ) -> (Vector<f64>, Vector<f64>) {
-        match self {
-            Shape::Point => (*position, *position),
-            Shape::Circle(radius) => {
-                let point = position + *axis * *radius;
-                (point, point)
-            }
-            Shape::Polygon { points, axes: _ } => {
-                let mut max = f64::NEG_INFINITY;
-                let mut max_point_index = 0;
-
-                let global_points: Vec<Vector<f64>> = points
-                    .iter()
-                    .map(|p| position + Rotation::new(orientation) * p)
-                    .collect();
-
-                for i in 0..global_points.len() {
-                    let projection = global_points[i].dot(axis);
-
-                    if projection > max {
-                        max = projection;
-                        max_point_index = i;
-                    }
-                }
-
-                let point = global_points[max_point_index];
-                let (a, b) = (
-                    global_points
-                        [(max_point_index + global_points.len() - 1) % global_points.len()],
-                    global_points[(max_point_index + 1) % global_points.len()],
-                );
-
-                let a_edge = (point, a);
-                let b_edge = (point, b);
-
-                if (point - a).normalize().dot(&axis).abs()
-                    <= (point - b).normalize().dot(&axis).abs()
-                {
-                    a_edge
-                } else {
-                    b_edge
-                }
-            }
-        }
     }
 }
