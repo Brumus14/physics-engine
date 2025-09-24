@@ -139,6 +139,20 @@ impl Spring {
             elasticity,
         }
     }
+
+    pub fn new_auto_length(body_ids: [Id; 2], elasticity: f64, bodies: &mut IdMap<Body>) -> Self {
+        let (a, b) = (
+            bodies.get(body_ids[0]).unwrap(),
+            bodies.get(body_ids[1]).unwrap(),
+        );
+        let length = a.linear.position.metric_distance(&b.linear.position);
+
+        Self {
+            bodies: body_ids,
+            length,
+            elasticity,
+        }
+    }
 }
 
 impl Effector for Spring {

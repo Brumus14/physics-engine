@@ -57,8 +57,12 @@ impl World {
         self.effectors.remove(id);
     }
 
-    pub fn get_effector(&mut self, id: Id) -> Option<&Box<dyn Effector + Send + Sync>> {
+    pub fn get_effector(&self, id: Id) -> Option<&Box<dyn Effector + Send + Sync>> {
         self.effectors.get(id)
+    }
+
+    pub fn get_effector_mut(&mut self, id: Id) -> Option<&mut Box<dyn Effector + Send + Sync>> {
+        self.effectors.get_mut(id)
     }
 
     pub fn add_collision_pipeline(
@@ -71,6 +75,20 @@ impl World {
 
     pub fn remove_collision_pipeline(&mut self, id: Id) {
         self.collision_pipelines.remove(id);
+    }
+
+    pub fn get_collision_pipeline(
+        &self,
+        id: Id,
+    ) -> Option<&Box<dyn CollisionPipeline + Send + Sync>> {
+        self.collision_pipelines.get(id)
+    }
+
+    pub fn get_collision_pipeline_mut(
+        &mut self,
+        id: Id,
+    ) -> Option<&mut Box<dyn CollisionPipeline + Send + Sync>> {
+        self.collision_pipelines.get_mut(id)
     }
 
     pub fn apply_effectors(&mut self) {
@@ -86,6 +104,14 @@ impl World {
 
     pub fn remove_integrator(&mut self, id: Id) {
         self.integrators.remove(id);
+    }
+
+    pub fn get_integrator(&self, id: Id) -> Option<&Box<dyn Integrator + Send + Sync>> {
+        self.integrators.get(id)
+    }
+
+    pub fn get_integrator_mut(&mut self, id: Id) -> Option<&mut Box<dyn Integrator + Send + Sync>> {
+        self.integrators.get_mut(id)
     }
 
     pub fn step(&mut self, delta_time: f64) {

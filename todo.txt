@@ -1,7 +1,3 @@
 gui
 maybe move from bevy to wgpu
 web build
-optimise
-stop hashmaps in world
-maybe just have one body not point and rigid, then have body builder like static, rigid that builds a singular body struct
-maybe rectangle shape just builds a polygon

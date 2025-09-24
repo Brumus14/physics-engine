@@ -240,7 +240,48 @@ impl NarrowPhase for DefaultNarrowPhase {
                         .map(|axis| Rotation::new(b.angular.orientation) * axis)
                         .collect(),
                 ),
-                _ => None,
+                (
+                    Shape::Point,
+                    Shape::Polygon {
+                        points: b_points,
+                        axes: b_axes,
+                    },
+                ) => DefaultNarrowPhase::detect_sat_circle(
+                    pair[1],
+                    &b.linear.position,
+                    &b_points
+                        .iter()
+                        .map(|p| b.linear.position + Rotation::new(b.angular.orientation) * p)
+                        .collect(),
+                    &b_axes
+                        .iter()
+                        .map(|axis| Rotation::new(b.angular.orientation) * axis)
+                        .collect(),
+                    pair[0],
+                    &a.linear.position,
+                    0.0,
+                ),
+                (
+                    Shape::Polygon {
+                        points: a_points,
+                        axes: a_axes,
+                    },
+                    Shape::Point,
+                ) => DefaultNarrowPhase::detect_sat_circle(
+                    pair[0],
+                    &a.linear.position,
+                    &a_points
+                        .iter()
+                        .map(|p| a.linear.position + Rotation::new(a.angular.orientation) * p)
+                        .collect(),
+                    &a_axes
+                        .iter()
+                        .map(|axis| Rotation::new(a.angular.orientation) * axis)
+                        .collect(),
+                    pair[1],
+                    &b.linear.position,
+                    0.0,
+                ),
             };
 
             if let Some(collision) = collision {
@@ -291,6 +332,9 @@ impl DefaultNarrowPhase {
         b_position: &Vector<f64>,
         b_radius: f64,
     ) -> Option<CollisionData> {
+        // Treat points as tiny circles
+        let b_radius = b_radius.max(0.01);
+
         let mut closest_point: Option<&Vector<f64>> = None;
         let mut closest_distance = f64::INFINITY;
 
@@ -532,9 +576,9 @@ impl CollisionResolution for DefaultCollisionResolver {
 
     fn resolve(&mut self, collisions: Vec<CollisionData>, bodies: &mut IdMap<Body>) {
         for collision in collisions {
-            if collision.points.len() == 0 {
-                continue;
-            }
+            // if collision.points.len() == 0 {
+            //     continue;
+            // }
 
             let (a_id, b_id) = (collision.bodies[0], collision.bodies[1]);
             let [Some(a), Some(b)] = bodies.get_disjoint_mut([a_id, b_id]) else {
