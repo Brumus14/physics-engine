@@ -35,7 +35,7 @@ impl Body {
             linear,
             restitution,
             // Seems cheaty
-            angular: AngularState::new(0.0, 0.0, 1.0),
+            angular: AngularState::new(0.0, 0.0, f64::INFINITY),
             shape: Shape::Point,
         }
     }

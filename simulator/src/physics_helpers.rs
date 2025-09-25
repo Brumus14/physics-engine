@@ -123,3 +123,7 @@ pub fn spawn_physics_soft_body(
 
     id
 }
+
+pub fn reset_physics_world(world: World) {
+    world.reset();
+}

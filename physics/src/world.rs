@@ -9,7 +9,6 @@ use crate::{
 
 pub struct World {
     bodies: IdMap<Body>,
-    // body_groups: HashMap<Id, Vec<Id>>,
     integrators: IdMap<Box<dyn Integrator + Send + Sync>>,
     effectors: IdMap<Box<dyn Effector + Send + Sync>>,
     collision_pipelines: IdMap<Box<dyn CollisionPipeline + Send + Sync>>,
@@ -19,7 +18,6 @@ impl World {
     pub fn new() -> Self {
         Self {
             bodies: IdMap::new(),
-            // body_groups: HashMap::new(),
             integrators: IdMap::new(),
             effectors: IdMap::new(),
             collision_pipelines: IdMap::new(),
@@ -34,67 +32,16 @@ impl World {
         self.bodies.remove(id);
     }
 
-    // pub fn add_body_group(&mut self, ids: Vec<Id>) -> Id {
-    //     let id = self.body_id_pool.next();
-    //     self.body_groups.insert(id, ids);
-    //     id
-    //     self.body_groups.add(ids)
-    // }
-    //
-    // pub fn remove_body_group(&mut self, id: Id) -> Option<Vec<Id>> {
-    //     self.body_groups.remove(&id)
-    // }
-    //
-    // pub fn get_body_group(&self, id: Id) -> Option<&Vec<Id>> {
-    //     self.body_groups.get(&id)
-    // }
-
-    pub fn add_effector(&mut self, effector: Box<dyn Effector + Send + Sync>) -> Id {
-        self.effectors.add(effector)
+    pub fn clear_bodies(&mut self) {
+        self.bodies.clear();
     }
 
-    pub fn remove_effector(&mut self, id: Id) {
-        self.effectors.remove(id);
+    pub fn get_body(&self, id: Id) -> Option<&Body> {
+        self.bodies.get(id)
     }
 
-    pub fn get_effector(&self, id: Id) -> Option<&Box<dyn Effector + Send + Sync>> {
-        self.effectors.get(id)
-    }
-
-    pub fn get_effector_mut(&mut self, id: Id) -> Option<&mut Box<dyn Effector + Send + Sync>> {
-        self.effectors.get_mut(id)
-    }
-
-    pub fn add_collision_pipeline(
-        &mut self,
-        mut collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
-    ) -> Id {
-        collision_pipeline.init(&mut self.bodies);
-        self.collision_pipelines.add(collision_pipeline)
-    }
-
-    pub fn remove_collision_pipeline(&mut self, id: Id) {
-        self.collision_pipelines.remove(id);
-    }
-
-    pub fn get_collision_pipeline(
-        &self,
-        id: Id,
-    ) -> Option<&Box<dyn CollisionPipeline + Send + Sync>> {
-        self.collision_pipelines.get(id)
-    }
-
-    pub fn get_collision_pipeline_mut(
-        &mut self,
-        id: Id,
-    ) -> Option<&mut Box<dyn CollisionPipeline + Send + Sync>> {
-        self.collision_pipelines.get_mut(id)
-    }
-
-    pub fn apply_effectors(&mut self) {
-        for effector in self.effectors.values_mut() {
-            effector.apply(&mut self.bodies);
-        }
+    pub fn get_body_mut(&mut self, id: Id) -> Option<&mut Body> {
+        self.bodies.get_mut(id)
     }
 
     // Is there a way to not keep doing + Send + Sync
@@ -104,6 +51,10 @@ impl World {
 
     pub fn remove_integrator(&mut self, id: Id) {
         self.integrators.remove(id);
+    }
+
+    pub fn clear_integrators(&mut self) {
+        self.integrators.clear();
     }
 
     pub fn get_integrator(&self, id: Id) -> Option<&Box<dyn Integrator + Send + Sync>> {
@@ -126,17 +77,72 @@ impl World {
         }
     }
 
+    pub fn add_effector(&mut self, effector: Box<dyn Effector + Send + Sync>) -> Id {
+        self.effectors.add(effector)
+    }
+
+    pub fn remove_effector(&mut self, id: Id) {
+        self.effectors.remove(id);
+    }
+
+    pub fn clear_effectors(&mut self) {
+        self.effectors.clear();
+    }
+
+    pub fn get_effector(&self, id: Id) -> Option<&Box<dyn Effector + Send + Sync>> {
+        self.effectors.get(id)
+    }
+
+    pub fn get_effector_mut(&mut self, id: Id) -> Option<&mut Box<dyn Effector + Send + Sync>> {
+        self.effectors.get_mut(id)
+    }
+
+    pub fn apply_effectors(&mut self) {
+        for effector in self.effectors.values_mut() {
+            effector.apply(&mut self.bodies);
+        }
+    }
+
+    pub fn add_collision_pipeline(
+        &mut self,
+        mut collision_pipeline: Box<dyn CollisionPipeline + Send + Sync>,
+    ) -> Id {
+        collision_pipeline.init(&mut self.bodies);
+        self.collision_pipelines.add(collision_pipeline)
+    }
+
+    pub fn remove_collision_pipeline(&mut self, id: Id) {
+        self.collision_pipelines.remove(id);
+    }
+
+    pub fn clear_collision_pipelines(&mut self) {
+        self.collision_pipelines.clear();
+    }
+
+    pub fn get_collision_pipeline(
+        &self,
+        id: Id,
+    ) -> Option<&Box<dyn CollisionPipeline + Send + Sync>> {
+        self.collision_pipelines.get(id)
+    }
+
+    pub fn get_collision_pipeline_mut(
+        &mut self,
+        id: Id,
+    ) -> Option<&mut Box<dyn CollisionPipeline + Send + Sync>> {
+        self.collision_pipelines.get_mut(id)
+    }
+
     pub fn handle_collisions(&mut self) {
         for pipeline in self.collision_pipelines.values_mut() {
             pipeline.handle(&mut self.bodies);
         }
     }
 
-    pub fn get_body(&self, id: Id) -> Option<&Body> {
-        self.bodies.get(id)
-    }
-
-    pub fn get_body_mut(&mut self, id: Id) -> Option<&mut Body> {
-        self.bodies.get_mut(id)
+    pub fn reset(&mut self) {
+        self.clear_collision_pipelines();
+        self.clear_effectors();
+        self.clear_integrators();
+        self.clear_bodies();
     }
 }

@@ -1,7 +1,9 @@
+use std::any::Any;
+
 use crate::{
     body::Body,
     id_map::{Id, IdMap},
-    types::math::Vector,
+    types::{math::*, *},
 };
 
 // Maybe add init
@@ -16,6 +18,18 @@ pub struct ExplicitEuler {
 impl ExplicitEuler {
     pub fn new(bodies: Vec<Id>) -> Self {
         Self { bodies }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
+        }
     }
 }
 
@@ -52,6 +66,18 @@ pub struct SemiImplicitEuler {
 impl SemiImplicitEuler {
     pub fn new(bodies: Vec<Id>) -> Self {
         Self { bodies }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
+        }
     }
 }
 

@@ -3,21 +3,11 @@ use std::{any::Any, collections::HashMap};
 use crate::{
     body::{AngularState, Body, LinearState},
     id_map::{Id, IdMap},
-    types::math::*,
+    types::{math::*, *},
 };
 
-pub trait AsAny {
-    fn as_any(&self) -> &dyn Any;
-}
-
-impl<T: Effector> AsAny for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-}
-
 // Maybe add init
-pub trait Effector: Any + AsAny + Send + Sync {
+pub trait Effector: Any + AsAny {
     fn apply(&self, bodies: &mut IdMap<Body>);
 }
 
@@ -29,6 +19,18 @@ pub struct ConstantForce {
 impl ConstantForce {
     pub fn new(bodies: Vec<Id>, force: Vector<f64>) -> Self {
         Self { bodies, force }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
+        }
     }
 }
 
@@ -54,6 +56,18 @@ impl ConstantAcceleration {
             acceleration,
         }
     }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
+        }
+    }
 }
 
 impl Effector for ConstantAcceleration {
@@ -76,6 +90,18 @@ impl Gravity {
         Self {
             bodies,
             gravitational_constant,
+        }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
         }
     }
 }
@@ -111,6 +137,18 @@ pub struct ConstantTorque {
 impl ConstantTorque {
     pub fn new(bodies: Vec<Id>, torque: f64) -> Self {
         Self { bodies, torque }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
+        }
     }
 }
 
@@ -187,6 +225,18 @@ impl Drag {
         Self {
             bodies,
             coefficient,
+        }
+    }
+
+    fn add_body(&mut self, id: Id) {
+        if !self.bodies.contains(&id) {
+            self.bodies.push(id);
+        }
+    }
+
+    fn remove_body(&mut self, id: Id) {
+        if let Some(index) = self.bodies.iter().position(|i| *i == id) {
+            self.bodies.remove(index);
         }
     }
 }

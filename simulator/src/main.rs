@@ -1,5 +1,6 @@
 mod camera_controller;
 mod physics_helpers;
+mod scenes;
 
 use crate::camera_controller::camera_controller;
 use crate::physics_helpers::*;
@@ -202,7 +203,11 @@ struct UiState {
     is_intro_open: bool,
 }
 
-fn ui_pass(mut ui_state: ResMut<UiState>, mut contexts: EguiContexts) -> Result {
+fn ui_pass(
+    mut ui_state: ResMut<UiState>,
+    mut contexts: EguiContexts,
+    mut physics_world: ResMut<PhysicsWorld>,
+) -> Result {
     let ctx = contexts.ctx_mut()?;
 
     egui::Window::new("Intro")
@@ -213,7 +218,10 @@ fn ui_pass(mut ui_state: ResMut<UiState>, mut contexts: EguiContexts) -> Result 
         .default_width(200.0)
         .show(ctx, |ui| {
             ui.heading("Manager");
-            ui.button("Scene 1");
+
+            if ui.button("Falling Rectangles").clicked() {
+                scenes::falling_rectangles(&mut physics_world.world);
+            }
         });
     Ok(())
 }

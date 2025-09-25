@@ -57,6 +57,12 @@ impl<T> IdMap<T> {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.values = Vec::new();
+        self.next_id = 0;
+        self.free_ids = HashSet::new();
+    }
+
     pub fn get(&self, id: Id) -> Option<&T> {
         if let Some(value) = self.values.get(id) {
             value.as_ref()
