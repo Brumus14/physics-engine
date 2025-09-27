@@ -124,6 +124,6 @@ pub fn spawn_physics_soft_body(
     id
 }
 
-pub fn reset_physics_world(world: World) {
-    world.reset();
+pub fn reset_physics_world(commands: &mut Commands, physics_entities: Query<, physics_world: &mut ResMut<PhysicsWorld>) {
+    physics_world.world.reset();
 }
