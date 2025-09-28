@@ -5,6 +5,7 @@ mod ui;
 
 use crate::camera_controller::camera_controller;
 use crate::physics_helpers::*;
+use crate::scenes::PhysicsScene;
 use crate::ui::{UiState, ui_pass};
 use bevy::{
     asset::RenderAssetUsages,
@@ -33,29 +34,25 @@ fn main() {
         .init_resource::<UiState>()
         .add_plugins((
             DefaultPlugins,
-            FpsOverlayPlugin {
-                config: FpsOverlayConfig {
-                    text_config: TextFont {
-                        font_size: 42.0,
-                        font: default(),
-                        font_smoothing: FontSmoothing::default(),
-                        ..default()
-                    },
-                    text_color: Color::WHITE,
-                    refresh_interval: core::time::Duration::from_millis(100),
-                    enabled: true,
-                },
-            },
+            // FpsOverlayPlugin {
+            //     config: FpsOverlayConfig {
+            //         text_config: TextFont {
+            //             font_size: 42.0,
+            //             font: default(),
+            //             font_smoothing: FontSmoothing::default(),
+            //             ..default()
+            //         },
+            //         text_color: Color::WHITE,
+            //         refresh_interval: core::time::Duration::from_millis(100),
+            //         enabled: true,
+            //     },
+            // },
             EguiPlugin::default(),
         ))
         .add_systems(Startup, (startup_physics, startup).chain())
-        .add_systems(Update, (handle_input, update_physics, update).chain())
+        .add_systems(Update, (update_physics, update).chain())
         .add_systems(Update, camera_controller)
-        .add_systems(
-            EguiPrimaryContextPass,
-            (ui_pass, handle_reset_scene, handle_load_scene),
-        )
-        .add_event::<ResetSceneEvent>()
+        .add_systems(EguiPrimaryContextPass, (ui_pass, handle_load_scene))
         .add_event::<LoadSceneEvent>()
         .run();
 }
@@ -74,6 +71,7 @@ fn startup(
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut physics_world: ResMut<PhysicsWorld>,
     mut ui_state: ResMut<UiState>,
+    mut load_event: EventWriter<LoadSceneEvent>,
 ) {
     ui_state.is_intro_open = true;
 
@@ -85,32 +83,7 @@ fn startup(
         }),
     ));
 
-    let mut rng = rand::rng();
-
-    let mut bodies: Vec<Id> = Vec::new();
-
-    for i in 0..100 {
-        bodies.push(spawn_physics_body(
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            &mut physics_world,
-            Body::new_rigid(
-                LinearState::new(
-                    Vector::new(
-                        rng.random_range(-800.0..800.0),
-                        rng.random_range(-500.0..500.0),
-                    ),
-                    Vector::zeros(),
-                    1.0,
-                ),
-                1.0,
-                AngularState::new(rng.random_range(0.0..f64::consts::TAU), 0.0, 1000.0),
-                Shape::new_circle(25.0),
-            ),
-            Color::WHITE,
-        ));
-    }
+    // load_event.write(LoadSceneEvent(PhysicsScene::FallingRectangles));
 }
 
 fn update_physics(
@@ -127,13 +100,13 @@ fn update_physics(
 
     for (body_id, mut transform) in body_query.iter_mut() {
         let BodyId(id) = body_id;
+        let body = physics_world.get_body(*id).unwrap();
 
-        let position = physics_world.get_body(*id).unwrap().linear.position;
+        let position = body.linear.position;
         transform.translation.x = position.x as f32;
         transform.translation.y = position.y as f32;
 
-        let rotation = physics_world.get_body(*id).unwrap().angular.orientation;
-        transform.rotation = Quat::from_rotation_z(rotation as f32);
+        transform.rotation = Quat::from_rotation_z(body.angular.orientation as f32);
     }
 
     for (effector_id, mut transform) in spring_query.iter_mut() {
@@ -168,41 +141,41 @@ fn update_physics(
     }
 }
 
-fn handle_input(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-    mut physics_world: ResMut<PhysicsWorld>,
-    mouse_input: Res<ButtonInput<MouseButton>>,
-    window: Query<&Window>,
-    camera: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
-) {
-    if mouse_input.just_pressed(MouseButton::Left) {
-        let window = window.single().unwrap();
-        let (camera, transform) = camera.single().unwrap();
-
-        if let Some(position) = window.cursor_position() {
-            if let Ok(position) = camera.viewport_to_world_2d(transform, position) {
-                spawn_physics_body(
-                    &mut commands,
-                    &mut meshes,
-                    &mut materials,
-                    &mut physics_world,
-                    Body::new_rigid(
-                        LinearState::new(
-                            Vector::new(position.x as f64, position.y as f64),
-                            Vector::zeros(),
-                            1.0,
-                        ),
-                        1.0,
-                        AngularState::new(0.0, 0.0, 1.0),
-                        Shape::Circle(25.0),
-                    ),
-                    Color::WHITE,
-                );
-            }
-        }
-    }
-}
+// fn handle_input(
+//     mut commands: Commands,
+//     mut meshes: ResMut<Assets<Mesh>>,
+//     mut materials: ResMut<Assets<ColorMaterial>>,
+//     mut physics_world: ResMut<PhysicsWorld>,
+//     mouse_input: Res<ButtonInput<MouseButton>>,
+//     window: Query<&Window>,
+//     camera: Query<(&Camera, &GlobalTransform), With<Camera2d>>,
+// ) {
+//     if mouse_input.just_pressed(MouseButton::Left) {
+//         let window = window.single().unwrap();
+//         let (camera, transform) = camera.single().unwrap();
+//
+//         if let Some(position) = window.cursor_position() {
+//             if let Ok(position) = camera.viewport_to_world_2d(transform, position) {
+//                 spawn_physics_body(
+//                     &mut commands,
+//                     &mut meshes,
+//                     &mut materials,
+//                     &mut physics_world,
+//                     Body::new_rigid(
+//                         LinearState::new(
+//                             Vector::new(position.x as f64, position.y as f64),
+//                             Vector::zeros(),
+//                             1.0,
+//                         ),
+//                         1.0,
+//                         AngularState::new(0.0, 0.0, 1.0),
+//                         Shape::Circle(25.0),
+//                     ),
+//                     Color::WHITE,
+//                 );
+//             }
+//         }
+//     }
+// }
 
 fn update() {}

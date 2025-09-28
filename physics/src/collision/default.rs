@@ -576,9 +576,9 @@ impl CollisionResolution for DefaultCollisionResolver {
 
     fn resolve(&mut self, collisions: Vec<CollisionData>, bodies: &mut IdMap<Body>) {
         for collision in collisions {
-            // if collision.points.len() == 0 {
-            //     continue;
-            // }
+            if collision.points.len() == 0 {
+                continue;
+            }
 
             let (a_id, b_id) = (collision.bodies[0], collision.bodies[1]);
             let [Some(a), Some(b)] = bodies.get_disjoint_mut([a_id, b_id]) else {
@@ -604,11 +604,14 @@ impl CollisionResolution for DefaultCollisionResolver {
 
             // Separate calculation for none angular bodies
             // What happens if one can rotate but other cant?
-            let impulse_magnitude = -(1.0 + restitution) * relative_velocity.dot(&collision.normal)
-                / (1.0 / a.linear.mass
-                    + 1.0 / b.linear.mass
-                    + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
-                    + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia);
+            // Can be 0?
+            let denominator = 1.0 / a.linear.mass
+                + 1.0 / b.linear.mass
+                + a_to_point.perp(&collision.normal).powi(2) / a.angular.inertia
+                + b_to_point.perp(&collision.normal).powi(2) / b.angular.inertia;
+
+            let impulse_magnitude =
+                -(1.0 + restitution) * relative_velocity.dot(&collision.normal) / denominator;
 
             a.linear.velocity -= (impulse_magnitude / a.linear.mass) * collision.normal;
             a.angular.velocity -=

@@ -17,7 +17,7 @@ use physics::{
     world::World,
 };
 
-use crate::scenes::{self, FallingRectangles};
+use crate::scenes::{self, PhysicsScene, falling_rectangles};
 
 pub const POINT_SIZE: f32 = 10.0;
 pub const SPRING_SIZE: f32 = 10.0;
@@ -138,28 +138,6 @@ pub fn reset_physics_world(
     physics_world.world.reset();
 }
 
-#[derive(Clone, Copy)]
-pub enum PhysicsScene {
-    FallingRectangles,
-}
-
-#[derive(Resource)]
-pub struct CurrentPhysicsScene(PhysicsScene);
-
-#[derive(Event)]
-pub struct ResetSceneEvent;
-
-pub fn handle_reset_scene(
-    mut reset_event: EventReader<ResetSceneEvent>,
-    mut commands: Commands,
-    physics_entities: Query<Entity, Or<(With<BodyId>, With<EffectorId>)>>,
-    mut physics_world: ResMut<PhysicsWorld>,
-) {
-    for _ in reset_event.read() {
-        reset_physics_world(&mut commands, physics_entities, &mut physics_world);
-    }
-}
-
 #[derive(Event)]
 pub struct LoadSceneEvent(pub PhysicsScene);
 
@@ -168,14 +146,56 @@ pub fn handle_load_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    physics_entities: Query<Entity, Or<(With<BodyId>, With<EffectorId>)>>,
     mut physics_world: ResMut<PhysicsWorld>,
-    mut physics_scene: ResMut<CurrentPhysicsScene>,
 ) {
     for LoadSceneEvent(scene) in load_event.read() {
-        *physics_scene = CurrentPhysicsScene(*scene);
+        reset_physics_world(&mut commands, physics_entities, &mut physics_world);
 
         match scene {
-            PhysicsScene::FallingRectangles => FallingRectangles::load(
+            PhysicsScene::FallingRectangles => scenes::falling_rectangles::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::Tower => scenes::tower::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::FallingCircles => scenes::falling_circles::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::CircleCollision => scenes::circle_collision::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::Spring => scenes::spring::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::CollisionSpring => scenes::collision_spring::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::Polygon => scenes::polygon::load(
+                &mut commands,
+                &mut meshes,
+                &mut materials,
+                &mut physics_world,
+            ),
+            PhysicsScene::Orbit => scenes::orbit::load(
                 &mut commands,
                 &mut meshes,
                 &mut materials,
