@@ -1,6 +1,5 @@
 use bevy::{
     asset::RenderAssetUsages,
-    dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
     text::FontSmoothing,

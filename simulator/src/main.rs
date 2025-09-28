@@ -9,7 +9,6 @@ use crate::scenes::PhysicsScene;
 use crate::ui::{UiState, ui_pass};
 use bevy::{
     asset::RenderAssetUsages,
-    dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
     input::mouse::MouseWheel,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology},
@@ -32,23 +31,7 @@ use std::f64;
 fn main() {
     App::new()
         .init_resource::<UiState>()
-        .add_plugins((
-            DefaultPlugins,
-            // FpsOverlayPlugin {
-            //     config: FpsOverlayConfig {
-            //         text_config: TextFont {
-            //             font_size: 42.0,
-            //             font: default(),
-            //             font_smoothing: FontSmoothing::default(),
-            //             ..default()
-            //         },
-            //         text_color: Color::WHITE,
-            //         refresh_interval: core::time::Duration::from_millis(100),
-            //         enabled: true,
-            //     },
-            // },
-            EguiPlugin::default(),
-        ))
+        .add_plugins((DefaultPlugins, EguiPlugin::default()))
         .add_systems(Startup, (startup_physics, startup).chain())
         .add_systems(Update, (update_physics, update).chain())
         .add_systems(Update, camera_controller)
