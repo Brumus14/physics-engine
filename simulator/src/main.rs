@@ -1,9 +1,11 @@
 mod camera_controller;
 mod physics_helpers;
 mod scenes;
+mod ui;
 
 use crate::camera_controller::camera_controller;
 use crate::physics_helpers::*;
+use crate::ui::{UiState, ui_pass};
 use bevy::{
     asset::RenderAssetUsages,
     dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin},
@@ -49,7 +51,12 @@ fn main() {
         .add_systems(Startup, (startup_physics, startup).chain())
         .add_systems(Update, (handle_input, update_physics, update).chain())
         .add_systems(Update, camera_controller)
-        .add_systems(EguiPrimaryContextPass, ui_pass)
+        .add_systems(
+            EguiPrimaryContextPass,
+            (ui_pass, handle_reset_scene, handle_load_scene),
+        )
+        .add_event::<ResetSceneEvent>()
+        .add_event::<LoadSceneEvent>()
         .run();
 }
 
@@ -196,34 +203,6 @@ fn handle_input(
             }
         }
     }
-}
-
-#[derive(Default, Resource)]
-struct UiState {
-    is_intro_open: bool,
-}
-
-fn ui_pass(
-    mut ui_state: ResMut<UiState>,
-    mut contexts: EguiContexts,
-    mut physics_world: ResMut<PhysicsWorld>,
-) -> Result {
-    let ctx = contexts.ctx_mut()?;
-
-    egui::Window::new("Intro")
-        .open(&mut ui_state.is_intro_open)
-        .show(ctx, |ui| ui.label("Welcome to my physics engine"));
-
-    egui::SidePanel::left("left_panel")
-        .default_width(200.0)
-        .show(ctx, |ui| {
-            ui.heading("Manager");
-
-            if ui.button("Falling Rectangles").clicked() {
-                scenes::falling_rectangles(&mut physics_world.world);
-            }
-        });
-    Ok(())
 }
 
 fn update() {}
